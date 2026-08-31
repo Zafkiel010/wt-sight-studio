@@ -5101,6 +5101,9 @@ function studioRedo() {
 function studioShow() {
   $('studioOverlay').classList.add('show');
   studio._edited = false; // 清除上一次 studio 会话的编辑状态
+  studio._aiDrawn = false; // 清除 AI 线稿已写入 userCanvas 的标记，让 studioLoadReference 重新画
+  studio.userCtx.clearRect(0, 0, studio.W, studio.H); // 清空 userCanvas，准备接收新的 AI 线稿 + 用户手绘
+  studio.history.length = 0; studio.redoStack.length = 0; // 清空撤销栈
   // 进入时用 lastOpts 初始化坐标面板
   studioInitRefFromOpts();
   setTimeout(() => {
@@ -5161,6 +5164,12 @@ function studioLoadReference() {
   const rctx = studio.refCtx;
   // 清 refCanvas（参考层），不动用户层（studio.canvas）
   rctx.clearRect(0, 0, studio.W, studio.H);
+  // 用户还没手绘过（_edited=false）：清 userCanvas + 重置 _aiDrawn，让 AI 线稿重新画到当前位置
+  // 这样变换模式移动 gen 层、refMode 切换等都能正确更新 AI 线稿位置
+  if (!studio._edited) {
+    studio.userCtx.clearRect(0, 0, studio.W, studio.H);
+    studio._aiDrawn = false;
+  }
   // blk 坐标 → 画布像素（参考层和用户层共用同一套公式）
   const b2p = (bx, by) => ({
     x: (bx + 0.5) * studio.W,
@@ -5170,43 +5179,15 @@ function studioLoadReference() {
   studio._lastGenRect = null;
   studio._lastSrcRect = null;
 
-  // 1. 画 AI 生成瞄具线条（黑色不透明，永远不被橡皮擦）
+  // 1. 画 AI 生成瞄具线条（画到 userCanvas，可被橡皮擦/撤销操作）
+  //    用 _aiDrawn flag 防止 studioLoadReference 重复画到 userCanvas 覆盖用户编辑
   if ((mode === 'gen' || mode === 'both') && lastOpts && lastOpts._polylines) {
-    rctx.save();
-    rctx.strokeStyle = '#000000';
-    rctx.lineWidth = 1.5;
-    rctx.lineCap = 'round';
     const o = lastOpts;
     const rx0 = studio.refX;
     const ry0 = studio.refY;
     const rw = studio.refW;
     const artH = rw * (o.GH / o.GW);
-    for (const pl of lastOpts._polylines) {
-      const pts = pl.p;
-      if (!pts || pts.length < 2) continue;
-      rctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const bx = rx0 + pts[i][0] / o.GW * rw + WT_X_OFFSET;
-        const by = ry0 * Y_BLK_SCALE + (pts[i][1] / o.GH) * artH - WT_Y_CENTER;
-        const p = b2p(bx, by);
-        if (i === 0) rctx.moveTo(p.x, p.y); else rctx.lineTo(p.x, p.y);
-      }
-      if (pl.closed) rctx.closePath();
-      rctx.stroke();
-    }
-    rctx.strokeStyle = '#000000';
-    rctx.lineWidth = 1;
-    for (const pl of lastOpts._polylines) {
-      if (!pl.fill) continue;
-      const s = pl.p;
-      const ax = rx0 + s[0][0] / o.GW * rw + WT_X_OFFSET;
-      const ay = ry0 * Y_BLK_SCALE + (s[0][1] / o.GH) * artH - WT_Y_CENTER;
-      const bx = rx0 + s[1][0] / o.GW * rw + WT_X_OFFSET;
-      const by = ry0 * Y_BLK_SCALE + (s[1][1] / o.GH) * artH - WT_Y_CENTER;
-      const pa = b2p(ax, ay), pb = b2p(bx, by);
-      rctx.beginPath(); rctx.moveTo(pa.x, pa.y); rctx.lineTo(pb.x, pb.y); rctx.stroke();
-    }
-    rctx.restore();
+    // 包围框每次都算（变换模式 hitTest 需要），但只画一次线稿
     const genBlkX0 = rx0 + WT_X_OFFSET;
     const genBlkY0 = ry0 * Y_BLK_SCALE - WT_Y_CENTER;
     const genBlkX1 = genBlkX0 + rw;
@@ -5215,6 +5196,44 @@ function studioLoadReference() {
     const gc = b2p(genBlkX1, genBlkY1);
     studio._lastGenRect = { x: ga.x, y: ga.y, w: gc.x - ga.x, h: gc.y - ga.y };
     studio.hasReference = true;
+    // 首次才画到 userCanvas
+    if (!studio._aiDrawn) {
+      const uctx = studio.userCtx;
+      uctx.save();
+      uctx.globalCompositeOperation = 'source-over';
+      uctx.strokeStyle = '#000000';
+      uctx.lineWidth = 1.5;
+      uctx.lineCap = 'round';
+      uctx.lineJoin = 'round';
+      uctx.imageSmoothingEnabled = false;
+      for (const pl of lastOpts._polylines) {
+        const pts = pl.p;
+        if (!pts || pts.length < 2) continue;
+        uctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const bx = rx0 + pts[i][0] / o.GW * rw + WT_X_OFFSET;
+          const by = ry0 * Y_BLK_SCALE + (pts[i][1] / o.GH) * artH - WT_Y_CENTER;
+          const p = b2p(bx, by);
+          if (i === 0) uctx.moveTo(p.x, p.y); else uctx.lineTo(p.x, p.y);
+        }
+        if (pl.closed) uctx.closePath();
+        uctx.stroke();
+      }
+      uctx.strokeStyle = '#000000';
+      uctx.lineWidth = 1;
+      for (const pl of lastOpts._polylines) {
+        if (!pl.fill) continue;
+        const s = pl.p;
+        const ax = rx0 + s[0][0] / o.GW * rw + WT_X_OFFSET;
+        const ay = ry0 * Y_BLK_SCALE + (s[0][1] / o.GH) * artH - WT_Y_CENTER;
+        const bx = rx0 + s[1][0] / o.GW * rw + WT_X_OFFSET;
+        const by = ry0 * Y_BLK_SCALE + (s[1][1] / o.GH) * artH - WT_Y_CENTER;
+        const pa = b2p(ax, ay), pb = b2p(bx, by);
+        uctx.beginPath(); uctx.moveTo(pa.x, pa.y); uctx.lineTo(pb.x, pb.y); uctx.stroke();
+      }
+      uctx.restore();
+      studio._aiDrawn = true;
+    }
   }
 
   // 2. 画原图（灰色半透明到 refCanvas，用 studio.srcX/srcY/srcScale 独立定位）

@@ -130,8 +130,10 @@
   #studioHint { position: absolute; bottom: 12px; left: 12px; font-size: 11px; color: #aaa; background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px; pointer-events: none; z-index: 10000; }
   #studioStatus { position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: #aaa; background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px; pointer-events: none; z-index: 10000; font-family: Consolas, monospace; }
 
+  .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .hd h1 { margin-bottom: 0; }
   /* 语言切换按钮 */
-  #langBtn { position: absolute; top: 14px; right: 16px; padding: 2px 8px; font-size: 11px; background: var(--panel); color: var(--acc); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; z-index: 100; line-height: 1.4; }
+  #langBtn { padding: 1px 6px; font-size: 10px; background: var(--panel); color: var(--acc); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; line-height: 1.3; flex-shrink: 0; }
   #langBtn:hover { border-color: var(--acc); }
 
 </style>
@@ -163,12 +165,12 @@ const I18N_TXT = {
   '应用变换': 'Apply Xform',
   '显示手动层': 'Show manual', '显示生成层': 'Show gen',
   '② 生成 & 下载': '② Generate & Download',
-  '一键生成瞄具 .blk': 'Generate Sight .blk',
+  '生成瞄具 .blk': 'Generate Sight .blk',
   '用当前设置生成 .blk': 'Generate with current settings',
   '下载 .blk 文件': 'Download .blk',
   '下载手绘 .blk': 'Download hand-drawn .blk',
-  '一键 AI 转线稿（本地 ONNX）': 'AI Line Drawing (local ONNX)',
-  '一键 XDoG 生成瞄具（纯 JS·转线稿→blk）': 'XDoG Generate (pure JS · line→blk)',
+  'AI 转线稿（本地 ONNX）': 'AI Line Drawing (local ONNX)',
+  'XDoG 生成瞄具（纯 JS·转线稿→blk）': 'XDoG Generate (pure JS · line→blk)',
   '模型': 'Model',
   '二次元线稿 line-drawings': 'Anime line-drawings',
   '二次元线稿 + LineRelifer 增强（更锐利）': 'Anime line-drawings + LineRelifer (sharper)',
@@ -300,9 +302,11 @@ function applyLang(lang) {
 </script>
 </head>
 <body>
-<button id="langBtn" onclick="applyLang(CUR_LANG==='zh'?'en':'zh')">🇬🇧 EN</button>
 <div class="wrap">
-  <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
+  <header class="hd">
+    <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
+    <button id="langBtn" onclick="applyLang(CUR_LANG==='zh'?'en':'zh')">🇬🇧 EN</button>
+  </header>
   <div class="sub">全程本地处理，图片不出电脑 · 自动参数+线稿中心线+灰度密度填充 · 下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
 
   <div class="grid">
@@ -397,19 +401,18 @@ function applyLang(lang) {
 
     <div class="panel panel-sticky">
       <h2>② 生成 & 下载</h2>
-      <button id="go" disabled>一键生成瞄具 .blk</button>
+      <button id="go" disabled>生成瞄具 .blk</button>
       <button id="goManual" class="ghost" disabled>用当前设置生成 .blk</button>
       <button id="studioBtn" class="studio-entry" title="进入独立绘画工作台（中心准心+放大+像素橡皮+手绘描边）">✏️ 绘画工作台</button>
       <div class="row">
         <button id="dl" class="ghost" disabled>下载 .blk 文件</button>
-        <button id="dlManual" class="ghost">下载手绘 .blk</button>
       </div>
       <div class="row">
         <button id="blkImportBtn" class="ghost">导入 .blk 继续编辑</button>
       </div>
       <div class="row">
-        <button id="skRun" class="ghost" disabled>一键 AI 转线稿（本地 ONNX）</button>
-        <button id="skRunX" class="ghost" disabled>一键 XDoG 生成瞄具（纯 JS·转线稿→blk）</button>
+        <button id="skRun" class="ghost" disabled>AI 转线稿（本地 ONNX）</button>
+        <button id="skRunX" class="ghost" disabled>XDoG 生成瞄具（纯 JS·转线稿→blk）</button>
       </div>
       <div id="status"></div>
 
@@ -468,9 +471,9 @@ function applyLang(lang) {
         <button id="tgAdv" class="ghost">高级设置 ▾</button>
       </div>
       <div class="tips">
-        <b>推荐流程（全程无需打开高级）：</b>上传图片 → 点「<b>一键 AI 转线稿</b>」把插画自动转成黑白线稿（本地 ONNX 推理，不出电脑）→ 点「<b>一键生成瞄具 .blk</b>」→ 在下方预览里<b>直接拖动图案调整位置和大小</b>→ 下载 .blk。<br>
+        <b>推荐流程（全程无需打开高级）：</b>上传图片 → 点「<b>AI 转线稿</b>」把插画自动转成黑白线稿（本地 ONNX 推理，不出电脑）→ 点「<b>生成瞄具 .blk</b>」→ 在下方预览里<b>直接拖动图案调整位置和大小</b>→ 下载 .blk。<br>
         所有参数默认自动判断：网格、阈值、桥接、笔画、填充强度均根据图像尺寸、对比度、墨量、最大块面积自动取最优；高级里打开才能手改。<br>
-        <b>使用方法</b>：双击 <b>wt-sight-studio.html</b> 即可打开（XDoG 生成、一键生成、绘画工作台全可用，图片不上传、不出电脑）。<br>
+        <b>使用方法</b>：双击 <b>wt-sight-studio.html</b> 即可打开（XDoG 生成、生成瞄具、绘画工作台全可用，图片不上传、不出电脑）。<br>
         <b>AI 转线稿（ONNX）</b>需要 HTTP 服务：运行 <b>_serve.ps1</b>（或任意静态文件服务器）后访问 http://127.0.0.1:18923/ 。
       </div>
     </div>
@@ -676,7 +679,7 @@ function loadFile(f) {
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
-    setStatus('已加载，点「一键 AI 转线稿」预处理，或直接点「一键生成瞄具 .blk」', 'ok');
+    setStatus('已加载，点「AI 转线稿」预处理，或直接点「生成瞄具 .blk」', 'ok');
   };
   im.onerror = () => setStatus('图片加载失败', 'err');
   im.src = url;
@@ -1604,7 +1607,7 @@ async function aiSketch(apply) {
       im.src = lastSketchUrl;
     });
     pvTag.textContent = 'AI 线稿 ' + W + '×' + H + ' · 推理 ' + secs + 's · 已应用为输入图';
-    setStatus('AI 线稿完成！现在点「一键生成瞄具 .blk」即可', 'ok');
+    setStatus('AI 线稿完成！现在点「生成瞄具 .blk」即可', 'ok');
   } else {
     const pw = pv.width;
     pv.height = Math.max(60, Math.round(pw * H / W));
@@ -1725,7 +1728,7 @@ async function xdogSketch(apply) {
       im.src = lastSketchUrl;
     });
     pvTag.textContent = 'XDoG 线稿 ' + W + '×' + H + ' · σ1=' + sigma1 + ' σ2=' + sigma2 + ' φ=' + phi + ' · ' + secs + 's · 已应用为输入图';
-    setStatus('XDoG 线稿完成（' + secs + 's）！现在点「一键生成瞄具 .blk」即可', 'ok');
+    setStatus('XDoG 线稿完成（' + secs + 's）！现在点「生成瞄具 .blk」即可', 'ok');
   } else {
     const pw = pv.width;
     pv.height = Math.max(60, Math.round(pw * H / W));
@@ -3839,7 +3842,8 @@ dl.onclick = () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
 
-$('dlManual').onclick = () => {
+// $('dlManual') 按钮已移除，保留 generateManualOnlyBlk 函数供调试
+if ($('dlManual')) $('dlManual').onclick = () => {
   const blk = generateManualOnlyBlk();
   if (!blk) return;
   const blob = new Blob([blk], { type: 'application/octet-stream' });

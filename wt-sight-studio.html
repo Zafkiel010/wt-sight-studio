@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WT Sight Studio · 战雷瞄具生成器</title>
+<title>WT Sight Studio · 战雷瞄具生成器 [Alpha]</title>
 <style>
   :root { --bg:#14171c; --panel:#1d222a; --line:#2c3440; --txt:#d8dee6; --dim:#8a94a3; --acc:#e8b04a; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,6 +11,13 @@
   .wrap { max-width: 1280px; margin: 0 auto; }
   h1 { font-size: 20px; margin-bottom: 4px; }
   h1 .mark { color: var(--acc); }
+  h1 .ver {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    background: linear-gradient(135deg,#ff6b6b,#ffa94d);
+    color: #fff; padding: 2px 7px; border-radius: 4px;
+    vertical-align: middle; margin-left: 6px;
+    box-shadow: 0 1px 3px rgba(255,107,107,.35);
+  }
   .sub { color: var(--dim); font-size: 12px; margin-bottom: 14px; line-height: 1.7; }
   .grid { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
@@ -295,7 +302,7 @@ function applyLang(lang) {
 <body>
 <button id="langBtn" onclick="applyLang(CUR_LANG==='zh'?'en':'zh')">🇬🇧 EN</button>
 <div class="wrap">
-  <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span></h1>
+  <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
   <div class="sub">全程本地处理，图片不出电脑 · 自动参数+线稿中心线+灰度密度填充 · 下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
 
   <div class="grid">

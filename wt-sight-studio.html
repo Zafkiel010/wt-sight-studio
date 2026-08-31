@@ -728,7 +728,7 @@ function loadDefaultSourceImage() {
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
   };
-  im.src = 'wt_default_reticle.jpg';
+  im.src = 'wt_default_source.jpg';
 }
 
 $('tgAdv').onclick = () => {
@@ -3986,7 +3986,7 @@ function boot() {
   // Kick off the default reticle background load — the user's reference screenshot.
   loadDefaultReticleImage();
   // 自动载入默认示例图为源图片，让访客打开网站即可一键体验
-  // loadDefaultSourceImage();   // 临时关闭：教程录制时从零开始
+  loadDefaultSourceImage();
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot);

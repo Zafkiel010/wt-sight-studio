@@ -130,11 +130,29 @@
   #studioHint { position: absolute; bottom: 12px; left: 12px; font-size: 11px; color: #aaa; background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px; pointer-events: none; z-index: 10000; }
   #studioStatus { position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: #aaa; background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px; pointer-events: none; z-index: 10000; font-family: Consolas, monospace; }
 
-  .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; padding-right: 32px; }
   .hd h1 { margin-bottom: 0; }
-  /* 语言切换按钮 */
-  #langBtn { padding: 0 4px; font-size: 9px; font-weight: 500; background: transparent; color: var(--dim); border: none; border-bottom: 1px dotted var(--dim); border-radius: 0; cursor: pointer; line-height: 1; flex-shrink: 0; letter-spacing: 0; }
-  #langBtn:hover { color: var(--acc); border-bottom-color: var(--acc); }
+  /* 语言切换 — 右上角小地球 + 下拉 */
+  .lang-wrap { position: fixed; top: 8px; right: 10px; z-index: 9999; }
+  .lang-btn {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; line-height: 1; padding: 0; transition: all .15s;
+  }
+  .lang-btn:hover { color: var(--acc); border-color: var(--acc); }
+  .lang-menu {
+    display: none; position: absolute; top: 26px; right: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
+    padding: 2px 0; min-width: 70px; box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  }
+  .lang-wrap.open .lang-menu { display: block; }
+  .lang-menu button {
+    display: block; width: 100%; padding: 4px 10px; font-size: 11px;
+    background: transparent; border: none; color: var(--txt); cursor: pointer; text-align: left;
+  }
+  .lang-menu button:hover { background: var(--line); color: var(--acc); }
+  .lang-menu button.active { color: var(--acc); }
 
 </style>
 <script>
@@ -294,18 +312,32 @@ function applyLang(lang) {
       }
     }
   });
-  // 切换按钮文字
-  const btn = document.getElementById('langBtn');
-  if (btn) btn.textContent = isEN ? '中文' : 'EN';
+  // 更新菜单 active 状态 + 关闭菜单
+  document.querySelectorAll('.lang-menu button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  const wrap = document.getElementById('langWrap');
+  if (wrap) wrap.classList.remove('open');
   document.documentElement.lang = isEN ? 'en' : 'zh-CN';
 }
+// 点击外部关闭语言菜单
+document.addEventListener('click', e => {
+  const w = document.getElementById('langWrap');
+  if (w && !w.contains(e.target)) w.classList.remove('open');
+});
 </script>
 </head>
 <body>
+<div class="lang-wrap" id="langWrap">
+  <button class="lang-btn" title="Language" onclick="document.getElementById('langWrap').classList.toggle('open')">🌐</button>
+  <div class="lang-menu">
+    <button data-lang="zh" onclick="applyLang('zh')">中文</button>
+    <button data-lang="en" onclick="applyLang('en')">English</button>
+  </div>
+</div>
 <div class="wrap">
   <header class="hd">
     <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
-    <button id="langBtn" onclick="applyLang(CUR_LANG==='zh'?'en':'zh')">EN</button>
   </header>
   <div class="sub">全程本地处理，图片不出电脑 · 自动参数+线稿中心线+灰度密度填充 · 下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
 
@@ -3897,6 +3929,10 @@ window.__run = ov => {
 function boot() {
   initSightCanvas();
   initManualEdit();
+  // 初始化语言菜单 active 状态
+  document.querySelectorAll('.lang-menu button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === CUR_LANG);
+  });
   // Show the sight preview area at boot so the default user-supplied reticle screenshot
   // is immediately visible — no need to first upload artwork.
   const wrap = $('sightWrap'); if (wrap) wrap.style.display = 'block';

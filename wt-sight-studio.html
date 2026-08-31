@@ -187,8 +187,8 @@ const I18N_TXT = {
   '用当前设置生成 .blk': 'Generate with current settings',
   '下载 .blk 文件': 'Download .blk',
   '下载手绘 .blk': 'Download hand-drawn .blk',
-  'AI 转线稿（本地 ONNX）': 'AI Line Drawing (local ONNX)',
-  'XDoG 生成瞄具（纯 JS·转线稿→blk）': 'XDoG Generate (pure JS · line→blk)',
+  'AI 转线稿': 'AI Line Drawing',
+  'XDoG 生成': 'XDoG Generate',
   '模型': 'Model',
   '二次元线稿 line-drawings': 'Anime line-drawings',
   '二次元线稿 + LineRelifer 增强（更锐利）': 'Anime line-drawings + LineRelifer (sharper)',
@@ -507,8 +507,6 @@ document.addEventListener('click', e => {
       <div class="tips">
         <b>推荐流程（全程无需打开高级）：</b>上传图片 → 点「<b>AI 转线稿</b>」把插画自动转成黑白线稿→ 点「<b>生成瞄具 .blk</b>」→ 在下方预览里<b>直接拖动图案调整位置和大小</b>→ 下载 .blk。<br>
         所有参数默认自动判断：网格、阈值、桥接、笔画、填充强度均根据图像尺寸、对比度、墨量、最大块面积自动取最优；高级里打开才能手改。<br>
-        <b></b><b></b><br>
-        <b></b> <b></b>
       </div>
     </div>
   </div>
@@ -717,6 +715,20 @@ function loadFile(f) {
   };
   im.onerror = () => setStatus('图片加载失败', 'err');
   im.src = url;
+}
+
+// 打开页面即自动载入默认示例图为源图片——访客无需上传就能直接点「AI 转线稿」/「生成瞄具 .blk」
+function loadDefaultSourceImage() {
+  const im = new Image();
+  im.onload = () => {
+    if (img) return; // 用户已手动上传则不覆盖
+    img = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「AI 转线稿」或上传你自己的图片';
+    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
+    drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
+    $('sightWrap').style.display = 'block';
+    resetSightLayoutToDefaults();
+  };
+  im.src = 'wt_default_reticle.png';
 }
 
 $('tgAdv').onclick = () => {
@@ -1565,14 +1577,45 @@ function loadOrt() {
   return ortReady;
 }
 const sketchSessions = {};
+// 带进度显示的模型下载（避免网慢时永远卡在"正在加载模型"）
+async function fetchModelWithProgress(url, label) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('模型下载失败 HTTP ' + res.status + '：' + url);
+  const total = +(res.headers.get('content-length') || 0);
+  if (!res.body || !total) {
+    const buf = await res.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+  const reader = res.body.getReader();
+  const chunks = []; let got = 0, lastUpd = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); got += value.length;
+    const now = performance.now();
+    if (now - lastUpd > 300) {
+      lastUpd = now;
+      setStatus('正在下载模型 ' + label + ' ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB…', 'busy');
+    }
+  }
+  const buf = new Uint8Array(got);
+  let off = 0;
+  for (const ch of chunks) { buf.set(ch, off); off += ch.length; }
+  return buf;
+}
 async function getSketchSession(name) {
   if (sketchSessions[name]) return sketchSessions[name];
+  // file:// 双击打开时浏览器拦截 fetch，直接给出明确提示而不是无限等待
+  if (location.protocol === 'file:') {
+    throw new Error('AI 转线稿不支持直接双击打开（浏览器安全限制）。请使用在线版网站，或运行 _serve.ps1 后访问 http://127.0.0.1:18923/');
+  }
   const ort = await loadOrt();
   ort.env.wasm.wasmPaths = new URL('ort/', location.href).href;
   ort.env.wasm.numThreads = 1;
-  setStatus('正在加载模型 ' + name + '（首次需几秒~几十秒）…', 'busy');
   const t0 = performance.now();
-  const sess = await ort.InferenceSession.create('model/' + name + '.onnx', { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+  const bytes = await fetchModelWithProgress('model/' + name + '.onnx', name);
+  setStatus('正在初始化模型 ' + name + '…', 'busy');
+  const sess = await ort.InferenceSession.create(bytes, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
   sketchSessions[name] = sess;
   console.log('模型加载', name, ((performance.now() - t0) / 1000).toFixed(1) + 's');
   return sess;
@@ -3942,6 +3985,8 @@ function boot() {
   updateAutoTags({ gridW: 800, dpEps: 0.7, thrOff: 0, bridge: 1, minLen: 3, fillStrength: 3, fillMin: 500, bgTol: 28, deburr: 2, deArea: 6, protectR: 2 });
   // Kick off the default reticle background load — the user's reference screenshot.
   loadDefaultReticleImage();
+  // 自动载入默认示例图为源图片，让访客打开网站即可一键体验
+  loadDefaultSourceImage();
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot);

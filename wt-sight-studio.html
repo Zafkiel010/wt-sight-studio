@@ -3984,9 +3984,9 @@ function boot() {
   // initial dummy auto tags
   updateAutoTags({ gridW: 800, dpEps: 0.7, thrOff: 0, bridge: 1, minLen: 3, fillStrength: 3, fillMin: 500, bgTol: 28, deburr: 2, deArea: 6, protectR: 2 });
   // Kick off the default reticle background load — the user's reference screenshot.
-  loadDefaultReticleImage();
+  // loadDefaultReticleImage();  // 临时关闭：教程录制时不需要默认底图
   // 自动载入默认示例图为源图片，让访客打开网站即可一键体验
-  loadDefaultSourceImage();
+  // loadDefaultSourceImage();   // 临时关闭：教程录制时从零开始
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot);

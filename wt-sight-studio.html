@@ -339,7 +339,7 @@ document.addEventListener('click', e => {
   <header class="hd">
     <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
   </header>
-  <div class="sub">全程本地处理，图片不出电脑 · 自动参数+线稿中心线+灰度密度填充 · 下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
+  <div class="sub">下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
 
   <div class="grid">
     <div class="panel">
@@ -443,8 +443,8 @@ document.addEventListener('click', e => {
         <button id="blkImportBtn" class="ghost">导入 .blk 继续编辑</button>
       </div>
       <div class="row">
-        <button id="skRun" class="ghost" disabled>AI 转线稿（本地 ONNX）</button>
-        <button id="skRunX" class="ghost" disabled>XDoG 生成瞄具（纯 JS·转线稿→blk）</button>
+        <button id="skRun" class="ghost" disabled>AI 转线稿</button>
+        <button id="skRunX" class="ghost" disabled>XDoG 生成</button>
       </div>
       <div id="status"></div>
 
@@ -503,10 +503,10 @@ document.addEventListener('click', e => {
         <button id="tgAdv" class="ghost">高级设置 ▾</button>
       </div>
       <div class="tips">
-        <b>推荐流程（全程无需打开高级）：</b>上传图片 → 点「<b>AI 转线稿</b>」把插画自动转成黑白线稿（本地 ONNX 推理，不出电脑）→ 点「<b>生成瞄具 .blk</b>」→ 在下方预览里<b>直接拖动图案调整位置和大小</b>→ 下载 .blk。<br>
+        <b>推荐流程（全程无需打开高级）：</b>上传图片 → 点「<b>AI 转线稿</b>」把插画自动转成黑白线稿→ 点「<b>生成瞄具 .blk</b>」→ 在下方预览里<b>直接拖动图案调整位置和大小</b>→ 下载 .blk。<br>
         所有参数默认自动判断：网格、阈值、桥接、笔画、填充强度均根据图像尺寸、对比度、墨量、最大块面积自动取最优；高级里打开才能手改。<br>
-        <b>使用方法</b>：双击 <b>wt-sight-studio.html</b> 即可打开（XDoG 生成、生成瞄具、绘画工作台全可用，图片不上传、不出电脑）。<br>
-        <b>AI 转线稿（ONNX）</b>需要 HTTP 服务：运行 <b>_serve.ps1</b>（或任意静态文件服务器）后访问 http://127.0.0.1:18923/ 。
+        <b></b><b></b><br>
+        <b></b> <b></b>
       </div>
     </div>
   </div>

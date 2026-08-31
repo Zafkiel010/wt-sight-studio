@@ -133,8 +133,8 @@
   .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
   .hd h1 { margin-bottom: 0; }
   /* 语言切换按钮 */
-  #langBtn { padding: 1px 6px; font-size: 10px; background: var(--panel); color: var(--acc); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; line-height: 1.3; flex-shrink: 0; }
-  #langBtn:hover { border-color: var(--acc); }
+  #langBtn { padding: 0 4px; font-size: 9px; font-weight: 500; background: transparent; color: var(--dim); border: none; border-bottom: 1px dotted var(--dim); border-radius: 0; cursor: pointer; line-height: 1; flex-shrink: 0; letter-spacing: 0; }
+  #langBtn:hover { color: var(--acc); border-bottom-color: var(--acc); }
 
 </style>
 <script>
@@ -296,7 +296,7 @@ function applyLang(lang) {
   });
   // 切换按钮文字
   const btn = document.getElementById('langBtn');
-  if (btn) btn.textContent = isEN ? '🇨🇳 中文' : '🇬🇧 EN';
+  if (btn) btn.textContent = isEN ? '中文' : 'EN';
   document.documentElement.lang = isEN ? 'en' : 'zh-CN';
 }
 </script>
@@ -305,7 +305,7 @@ function applyLang(lang) {
 <div class="wrap">
   <header class="hd">
     <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
-    <button id="langBtn" onclick="applyLang(CUR_LANG==='zh'?'en':'zh')">🇬🇧 EN</button>
+    <button id="langBtn" onclick="applyLang(CUR_LANG==='zh'?'en':'zh')">EN</button>
   </header>
   <div class="sub">全程本地处理，图片不出电脑 · 自动参数+线稿中心线+灰度密度填充 · 下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
 

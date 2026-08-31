@@ -4177,6 +4177,7 @@ const studio = {
   tStart: null, tOrig: null,
   loupeOn: true, // 放大镜开关
 };
+if (typeof window !== 'undefined') { window.studio = studio; }  // 暴露给调试/自动化
 const STUDIO_BG = '#ffffff';   // 白底画纸
 const STUDIO_INK = '#000000';  // 黑色墨水
 const STUDIO_CROSS = '#000000'; // 准心黑色

@@ -1,0 +1,43 @@
+# 临时文件
+_err.log
+_out.log
+_run.log
+_dl.blk
+_dl*.png
+_r_*.png
+_dsk.png
+_render.png
+_t520.png
+_t520.blk
+preview.png
+aya_*.png
+sight_*.blk
+
+# 压缩包
+*.zip
+*.rar
+*.7z
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/
+*.bak
+*.tmp
+_downloads/
+
+# 参考/脚本目录（本地开发用）
+_ref/
+_serve.ps1
+_render.ps1
+convert.ps1
+_exportblkmenu.js
+_reference.js
+_saveload.js
+_tools.js
+_vectorize-worker.js
+_vectorize.js
+opencv.js

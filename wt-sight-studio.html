@@ -160,24 +160,31 @@
 // key = 中文原文，value = 英文译文
 // applyLang 遍历所有 text node 和 title 属性进行替换
 const I18N_TXT = {
+  // —— 主标题 & 副标题 ——
   '· 战雷瞄具生成器': '· WT Sight Generator',
-  '全程本地处理，图片不出电脑 · 自动参数+线稿中心线+灰度密度填充 · 下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小':
-    '100% local processing, images never leave your PC · Auto params + centerline + grayscale density fill · Drag the sight in the preview below to adjust XY position and size',
+  '下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小':
+    'Drag the sight in the preview below to adjust XY position and size',
   '① 上传图片': '① Upload Image',
   '点击选择 或 拖拽图片到此处': 'Click to select or drag an image here',
   '，任意尺寸均可（自动去背景，透明 PNG 自动铺白底）': ', any size (auto background removal, transparent PNG auto-white)',
+  '原图 / AI 线稿': 'Source / AI line',
+  '瞄具线条预览': 'Sight preview',
   '③ 战雷瞄具预览': '③ WT Sight Preview',
+  '战雷瞄具预览': 'WT Sight Preview',
   '（可拖动）': '(draggable)',
   '使用默认战雷准心底图': 'Use default WT reticle',
   '粘贴剪贴板为瞄具底图': 'Paste clipboard as reticle bg',
   '选择本地瞄具底图…': 'Select local reticle bg…',
   '移除自定义底图': 'Remove custom bg',
   '图案缩放到 20%': 'Fit sight to 20%',
+  '手动编辑工具': 'Manual edit tools',
+  '（在画布上手动添加/删除线条，合并到 blk）': '(add/remove lines on canvas, merge into .blk)',
   '选择': 'Select', '直线': 'Line', '手绘': 'Freehand', '矩形': 'Rect', '圆形': 'Circle',
   '横线': 'H-Line', '竖线': 'V-Line', '文字': 'Text', '填充': 'Fill', '橡皮': 'Eraser',
   '撤销': 'Undo', '重做': 'Redo', '清空': 'Clear',
   '左右镜像': 'Mirror X', '上下镜像': 'Mirror Y', '千分尺': 'Ruler', '中心十字': 'Crosshair',
   '绘画工作台': 'Drawing Studio',
+  '手动 0 条': 'Manual 0 lines',
   '线宽': 'LW', '字号': 'Font', '吸附': 'Snap', '填充行距': 'Fill step',
   'X偏移': 'X off', 'Y偏移': 'Y off', '缩放': 'Scale', '旋转°': 'Rot°',
   '应用变换': 'Apply Xform',
@@ -190,14 +197,17 @@ const I18N_TXT = {
   'AI 转线稿': 'AI Line Drawing',
   'XDoG 生成': 'XDoG Generate',
   '模型': 'Model',
+  'AI 转线稿 · 高级': 'AI Line Drawing · Advanced',
   '二次元线稿 line-drawings': 'Anime line-drawings',
   '二次元线稿 + LineRelifer 增强（更锐利）': 'Anime line-drawings + LineRelifer (sharper)',
+  'XDoG 转线稿 · 高级': 'XDoG · Advanced',
   'σ1 细节半径（0.3~1.5，默认 0.8）': 'σ1 detail radius (0.3~1.5, default 0.8)',
   'σ2 模糊半径（1.0~5.0，默认 2.4）': 'σ2 blur radius (1.0~5.0, default 2.4)',
   'φ 锐度增强（10~80，默认 30）': 'φ sharpness (10~80, default 30)',
   'ε 黑白阈值（0~0.3，默认 0.05）': 'ε binarize threshold (0~0.3, default 0.05)',
   '处理尺寸·长边（0=原图）': 'Process size · long edge (0=original)',
   '下载线稿 PNG': 'Download line PNG',
+  '转换 · 精度': 'Conversion · Precision',
   '网格宽度（精度，200~1600）': 'Grid width (precision, 200~1600)',
   '简化度 eps（越小越精细）': 'Simplify eps (smaller=finer)',
   '墨线阈值偏移（-60~60）': 'Ink threshold offset (-60~60)',
@@ -205,14 +215,18 @@ const I18N_TXT = {
   '最短笔画（格数，滤噪点）': 'Min stroke (cells, denoise)',
   '去毛边强度（0=自动，1~5 越大越狠）': 'Deburr strength (0=auto, 1~5 higher=stronger)',
   '去毛边最小面积（0=自动，格²≤则清除）': 'Deburr min area (0=auto, cells²≤remove)',
+  '黑块填充 · 高级（默认按原图灰度自动渐变密度）': 'Black Fill · Advanced (auto gradient by grayscale)',
   '启用黑块填充': 'Enable black fill',
   '填充强度（0=全自动，1~6 越大越密）': 'Fill strength (0=auto, 1~6 higher=denser)',
   '最小填充块（格²，防噪声）': 'Min fill block (cells², denoise)',
   '护眼色半径（0=自动，防眼白被填黑）': 'Eye-protect radius (0=auto, prevent eye fill)',
+  '去背景（填白）· 高级': 'BG Removal (fill white) · Advanced',
   '经典去背景（泛洪）': 'Classic bg removal (flood)',
   '背景容差（越大去得越狠）': 'Bg tolerance (higher=more aggressive)',
   '强力填白：清除图内与背景同色区域': 'Force white: clear in-image areas matching bg',
+  '裁剪（占原图比例，0~1）': 'Crop (ratio of source, 0~1)',
   '左': 'L', '上': 'T', '右': 'R', '下': 'B',
+  '其它 · 高级': 'Other · Advanced',
   '保留战雷中心十字准线': 'Keep WT center crosshair',
   '瞄具旁文字（留空不显示）': 'Sight label (empty=hide)',
   '位置 X（屏幕占比）': 'Position X (screen ratio)',
@@ -222,7 +236,9 @@ const I18N_TXT = {
   '高级设置 ▴': 'Advanced ▴',
   '关': 'Off', '中心': 'Center', '网格': 'Grid',
   '自动': 'Auto',
-  // 绘画工作台
+  '导入 .blk 继续编辑': 'Import .blk to edit',
+  '导入 .blk': 'Import .blk',
+  // —— 绘画工作台 ——
   '画笔': 'Pen', '像素橡皮': 'Eraser',
   '适合': 'Fit',
   '参考底图': 'Ref layer', '原图': 'Source', '叠加': 'Both',
@@ -233,13 +249,12 @@ const I18N_TXT = {
   '宽': 'W',
   '重置坐标': 'Reset pos',
   '导入手动层': 'Import manual',
-  '导入 .blk 继续编辑': 'Import .blk to edit',
-  '导入 .blk': 'Import .blk',
   '放大镜: 开': 'Loupe: On',
   '放大镜: 关': 'Loupe: Off',
   '导出 .blk': 'Export .blk',
   '应用并关闭': 'Apply & close',
   '关闭工作台': 'Close studio',
+  '对齐AI→原图': 'Align AI→Source',
 };
 // title 属性翻译
 const I18N_TITLE = {
@@ -268,6 +283,7 @@ const I18N_TITLE = {
   '清空画布': 'Clear canvas',
   '缩小': 'Zoom out', '放大': 'Zoom in',
   '拖动/缩放参考底图': 'Drag/scale reference layer',
+  '对齐 AI 瞄具到原图位置（Ctrl+Shift+A）': 'Align AI sight to source position (Ctrl+Shift+A)',
 };
 let CUR_LANG = 'zh';
 function applyLang(lang) {
@@ -736,7 +752,14 @@ $('tgAdv').onclick = () => {
   $('tgAdv').textContent = a.classList.contains('open') ? (CUR_LANG==='en'?'Advanced ▴':'收起设置 ▴') : (CUR_LANG==='en'?'Advanced ▾':'高级设置 ▾');
 };
 
-function setStatus(msg, cls) { statusEl.textContent = msg; statusEl.className = cls || ''; }
+function setStatus(msg, cls) {
+  if (CUR_LANG === 'en') {
+    for (const [zh, en] of Object.entries(I18N_TXT)) {
+      if (msg.includes(zh)) msg = msg.split(zh).join(en);
+    }
+  }
+  statusEl.textContent = msg; statusEl.className = cls || '';
+}
 
 function drawSrcPreview() {
   const c = $('pvSrc'), g = c.getContext('2d');

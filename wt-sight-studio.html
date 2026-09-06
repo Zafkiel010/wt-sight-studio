@@ -542,6 +542,12 @@ document.addEventListener('click', e => {
 
         <h3>黑块填充 · 高级（默认按原图灰度自动渐变密度）</h3>
         <div class="chk"><input type="checkbox" id="fillOn" checked><label for="fillOn" style="flex:1">启用黑块填充</label></div>
+        <div class="f"><label>填充方式（auto=复杂图自动用实心四边形）</label>
+          <select id="fillMode">
+            <option value="auto" selected>auto（复杂图自动 quads）</option>
+            <option value="quads">quads（实心四边形，省体积）</option>
+            <option value="scan">scan（传统扫描线排线）</option>
+          </select><span class="auto-tag" id="tagFillMode">自动</span></div>
         <div class="f"><label>填充强度（0=全自动，1~6 越大越密）</label><input type="number" id="fillStrength" value="0" min="0" max="6" step="1"><span class="auto-tag" id="tagFillS">自动</span></div>
         <div class="f"><label>最小填充块（格²，防噪声）</label><input type="number" id="fillMin" value="0" min="0" max="10000" step="50"><span class="auto-tag" id="tagFillM">自动</span></div>
         <div class="f"><label>护眼色半径（0=自动，防眼白被填黑）</label><input type="number" id="protectR" value="0" min="0" max="8" step="1"><span class="auto-tag" id="tagPR">自动</span></div>
@@ -583,6 +589,7 @@ const $ = id => document.getElementById(id);
 const drop = $('drop'), file = $('file'), go = $('go'), dl = $('dl');
 const statusEl = $('status'), pv = $('pv'), pvWrap = $('pvWrap'), pvTag = $('pvTag');
 let img = null, lastBlk = '', lastOpts = null;   // lastOpts 供预览画布重绘用
+let srcOriginal = null;   // AI/XDoG 应用前的原始彩图；动漫暗区还原（封闭暗色区域→实心填充）需要原图明暗信息
 // War Thunder .blk 坐标基准：屏幕宽度 = 1。屏幕高度因此 = 9/16 ≈ 0.5625。
 // 预览层 y0 / H 比例是相对屏幕高度归一化 (0..1)，写入 blk 时统一乘以本系数转换。
 const Y_BLK_SCALE = 9 / 16;
@@ -771,7 +778,7 @@ function loadFile(f) {
   const url = URL.createObjectURL(f);
   const im = new Image();
   im.onload = () => {
-    img = im; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
+    img = im; srcOriginal = im; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
     go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
@@ -787,7 +794,7 @@ function loadDefaultSourceImage() {
   const im = new Image();
   im.onload = () => {
     if (img) return; // 用户已手动上传则不覆盖
-    img = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「AI 转线稿」或上传你自己的图片';
+    img = im; srcOriginal = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「AI 转线稿」或上传你自己的图片';
     go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
@@ -838,16 +845,264 @@ const num = id => parseFloat($(id).value) || 0;
 // ============ geometry helpers ============
 function Idx(x, y, GW) { return y * GW + x; }
 function F(v) {
-  // 限制浮点数到 1e-8 精度：War Thunder blk 解析器对超长小数位（>10 位，尤其 IEEE 浮点垃圾位）会解析失败/丢弃整段 line，
-  // 导致扫描线填充（黑块）和部分线条在游戏内不加载。输出无 trailing 0 减少文件体积。
+  // 限制浮点数精度：War Thunder blk 解析器对超长小数位（>10 位，尤其 IEEE 浮点垃圾位）会解析失败/丢弃整段 line。
+  // 5 位小数 = 1e-5 单位 ≈ 瞄具画布上 1px 的 6%（1px ≈ 0.0007 单位），视觉零差异。
+  // 8→5 位每坐标省 ~3 字符 × 8 坐标 = 每段省 ~24B：1.5 万段整体省 ~360KB，复杂图 SIZE 裁尾直接归零。
   if (!isFinite(v)) return '0';
-  if (Math.abs(v) < 1e-10) return '0';
-  const s = v.toFixed(8);
+  if (Math.abs(v) < 1e-7) return '0';
+  const s = v.toFixed(5);
   return s.replace(/\.?0+$/, '');
 }
 
-function traceLoops(mask, GW, GH) { /* unused in line-only mode but kept for tests */
-  return [];
+// ===== 实心填充：掩码 → 边界环追踪 → (洞桥接) → 耳切三角剖分 → drawQuads =====
+// 官方动漫瞄具（_Anime_Leclerc.blk 等）证实 drawQuads 在用户瞄具里原生渲染，
+// 同等面积下 quads 比 1px 扫描线省 10~50 倍段数/字节，省下的预算全部换细节。
+function traceLoops(mask, GW, GH) {
+  // 有向边界边追踪：掩码像素的 4 侧中邻侧为空的部分生成有向边（内部始终在行进方向左侧），
+  // 再把边串成闭合环。外环与洞环方向相反，用 shoelace 符号区分。
+  // 顶点为整数格坐标；棋盘角点（两条出边共享一个顶点）按“左转 > 直行 > 右转”优先消歧，
+  // 避免对角相连的两个块被捏合成 8 字环。
+  const edges = new Map();
+  const vkey = (x, y) => y * (GW + 1) + x;
+  const put = (x1, y1, x2, y2) => {
+    const k = vkey(x1, y1);
+    let a = edges.get(k);
+    if (!a) { a = []; edges.set(k, a); }
+    a.push([x1, y1, x2, y2]);
+  };
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (!mask[y * GW + x]) continue;
+      const up = y > 0 && mask[(y - 1) * GW + x];
+      const dn = y < GH - 1 && mask[(y + 1) * GW + x];
+      const lf = x > 0 && mask[y * GW + x - 1];
+      const rt = x < GW - 1 && mask[y * GW + x + 1];
+      if (!up) put(x, y, x + 1, y);
+      if (!rt) put(x + 1, y, x + 1, y + 1);
+      if (!dn) put(x + 1, y + 1, x, y + 1);
+      if (!lf) put(x, y + 1, x, y);
+    }
+  }
+  const takeEdge = (x, y, dx, dy) => {
+    const arr = edges.get(vkey(x, y));
+    if (!arr || !arr.length) return null;
+    if (arr.length === 1) return arr.pop();
+    let bi = 0, bp = -1;
+    for (let i = 0; i < arr.length; i++) {
+      const ex = arr[i][2] - x, ey = arr[i][3] - y;
+      const cross = dx * ey - dy * ex;   // 左转为正
+      const dot = dx * ex + dy * ey;
+      const pri = cross > 0 ? 2 : (dot > 0 ? 1 : 0);
+      if (pri > bp) { bp = pri; bi = i; }
+    }
+    return arr.splice(bi, 1)[0];
+  };
+  const loops = [];
+  for (;;) {
+    let start = null;
+    for (const arr of edges.values()) { if (arr.length) { start = arr[0]; break; } }
+    if (!start) break;
+    const pts = [[start[0], start[1]]];
+    let cx = start[2], cy = start[3];
+    let dx = cx - start[0], dy = cy - start[1];
+    pts.push([cx, cy]);
+    let closed = false;
+    let guard = edges.size * 4 + 16;
+    while (guard-- > 0) {
+      const nxt = takeEdge(cx, cy, dx, dy);
+      if (!nxt) break;
+      if (nxt[2] === start[0] && nxt[3] === start[1]) { closed = true; break; }
+      pts.push([nxt[2], nxt[3]]);
+      dx = nxt[2] - nxt[0]; dy = nxt[3] - nxt[1];
+      cx = nxt[2]; cy = nxt[3];
+    }
+    if (closed && pts.length >= 4) loops.push(pts);
+    if (!closed) {
+      // 断链（消歧选边后剩余边图不连通）：沿路边已被 pop，但 start 边本身从未被消费，
+      // 下轮会被再次选中 → 外层 for(;;) 无限循环。强删它保证每轮至少消耗一条边。
+      const arr0 = edges.get(vkey(start[0], start[1]));
+      if (arr0) {
+        const i0 = arr0.findIndex(e => e[0] === start[0] && e[1] === start[1] && e[2] === start[2] && e[3] === start[3]);
+        if (i0 >= 0) arr0.splice(i0, 1);
+      }
+    }
+  }
+  return loops;
+}
+
+// 闭多边形 shoelace 面积（坐标数学符号，y-down 网格里外环为正）
+function loopArea2(pts) {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a;
+}
+
+// 洞桥接：把每个洞用零宽“锁眼”缝进外环，得到单一简单多边形（耳切可直接处理）
+function keyholeMerge(outer, holes) {
+  let poly = outer;
+  for (const h of holes) {
+    let bi = 0, bj = 0, bd = Infinity;
+    for (let i = 0; i < poly.length; i++) {
+      for (let j = 0; j < h.length; j++) {
+        const dx = poly[i][0] - h[j][0], dy = poly[i][1] - h[j][1];
+        const d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; bi = i; bj = j; }
+      }
+    }
+    poly = poly.slice(0, bi + 1).concat([h[bj]], h.slice(bj + 1), h.slice(0, bj + 1), poly.slice(bi));
+  }
+  return poly;
+}
+
+// 耳切三角剖分。输入任意简单多边形（CCW 或 CW 均可），返回 [A,B,C] 三角数组；
+// 剖不动（自交/退化）返回 null，调用方回退该块的扫描线填充。
+function earClipTri(polyIn) {
+  let a2 = loopArea2(polyIn);
+  if (!isFinite(a2) || Math.abs(a2) < 2) return null;
+  let pts = a2 < 0 ? polyIn.slice().reverse() : polyIn.slice();
+  // 去重相邻重复点
+  const V = [];
+  for (const p of pts) {
+    const t = V.length ? V[V.length - 1] : null;
+    if (!t || Math.abs(t[0] - p[0]) > 1e-9 || Math.abs(t[1] - p[1]) > 1e-9) V.push(p);
+  }
+  if (V.length >= 2) {
+    const f = V[0], l = V[V.length - 1];
+    if (Math.abs(f[0] - l[0]) < 1e-9 && Math.abs(f[1] - l[1]) < 1e-9) V.pop();
+  }
+  const n = V.length;
+  if (n < 3) return null;
+  const cross = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const inTriStrict = (p, a, b, c) => {
+    const e = 1e-9;
+    return cross(a, b, p) > e && cross(b, c, p) > e && cross(c, a, p) > e;
+  };
+  const idx = [];
+  for (let i = 0; i < n; i++) idx.push(i);
+  const tris = [];
+  // 正常耳切只需 ~n 轮。keyholeMerge 桥接后的多边形可能自交 → 切不动，
+  // 旧上限 n² 会让 380 顶点块空转 14 万轮 × O(n²) 检查 = 卡死主线程（动漫图眼白/高光洞必触发）。
+  // 4 倍余量内剖不出就快速失败，调用方回退扫描线。
+  let guard = 0, guardMax = n * 4 + 64;
+  while (idx.length > 3) {
+    if (guard++ > guardMax) return null;
+    let clipped = false;
+    for (let ii = 0; ii < idx.length; ii++) {
+      const ip = idx[(ii + idx.length - 1) % idx.length], ic = idx[ii], inx = idx[(ii + 1) % idx.length];
+      const a = V[ip], b = V[ic], c = V[inx];
+      if (cross(a, b, c) <= 1e-9) continue;   // 反顶点或共线
+      let blocked = false;
+      for (let k = 0; k < idx.length; k++) {
+        const j = idx[k];
+        if (j === ip || j === ic || j === inx) continue;
+        if (inTriStrict(V[j], a, b, c)) { blocked = true; break; }
+      }
+      if (blocked) continue;
+      tris.push([a, b, c]);
+      idx.splice(ii, 1);
+      clipped = true;
+      break;
+    }
+    if (!clipped) return null;
+  }
+  const a = V[idx[0]], b = V[idx[1]], c = V[idx[2]];
+  if (cross(a, b, c) > 1e-9) tris.push([a, b, c]);
+  if (!tris.length) return null;
+  return tris;
+}
+
+// 单个实心分量 → 三角形数组。流程：环追踪 → 预滤 + 闭 DP 简化（含洞）→ 洞桥接 → 耳切。
+// eps 过粗导致顶点超上限时按倍数加粗重简。失败返回 null。
+function solidBlobTriangles(mask, GW, GH, eps) {
+  const loops = traceLoops(mask, GW, GH);
+  if (!loops.length) return null;
+  let outer = null, outerA = 0;
+  const holes = [];
+  const MIN_HOLE_AREA = 5;   // 更小的洞直接填死（视觉不可见，省桥接开销）
+  for (const lp of loops) {
+    const s = dpSimplify(preFilter(lp), eps);
+    if (s.length < 3) continue;
+    const a2 = loopArea2(s);
+    if (Math.abs(a2) < 8) continue;
+    if (a2 > 0) { if (!outer || a2 > outerA) { outer = s; outerA = a2; } }
+    else if (Math.abs(a2) >= MIN_HOLE_AREA) holes.push(s);
+  }
+  if (!outer || outer.length < 3) return null;
+  let poly = outer;
+  if (holes.length) {
+    if (holes.length > 12) holes.length = 12;   // 洞太多=噪声区，桥接费顶点不值得
+    poly = keyholeMerge(outer, holes);
+  }
+  let v = poly, curEps = eps;
+  // 耳切最坏 O(n³)，顶点数必须硬约束（动漫头发=单一巨块，轮廓几百顶点直接卡死主线程）：
+  // 目标 ≤320，6 轮重简仍 >380 直接放弃回退扫描线
+  for (let pass = 0; pass < 6 && v.length > 320; pass++) { curEps *= 1.8; v = dpSimplify(v, curEps); }
+  if (v.length > 380) return null;
+  let tris = earClipTri(v);
+  // 锁眼桥接/独立简化可能引入自交 → 耳切快速失败。渐进加大 eps 重简（消除自交退化）再试 2 次
+  for (let retry = 0; !tris && retry < 2; retry++) {
+    curEps *= 2.2;
+    v = dpSimplify(v, curEps);
+    if (v.length < 4) break;
+    tris = earClipTri(v);
+  }
+  return tris;
+}
+
+// 相邻三角形对（共享完整边）贪心合并为凸四边形：同面积 quad 数量/体积约砍半，
+// 省下的预算换给线条细节。耳切输出的共享边顶点是同一引用，坐标完全相等，量化配对无碰撞。
+// 返回四点环序 [p0,p1,p2,p3]；未配对三角形以 p2===p3 退化输出（序列化端无需区分）。
+function mergeTrisToQuads(tris) {
+  const key = p => Math.round(p[0] * 256) + '_' + Math.round(p[1] * 256);
+  const ekey = (a, b) => { const ka = key(a), kb = key(b); return ka < kb ? ka + '|' + kb : kb + '|' + ka; };
+  const edgeMap = new Map();   // ekey -> { ti, P, Q } 已登记未配对的边
+  const done = new Uint8Array(tris.length);
+  const cross = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const convex = q => {        // 环序四边形：相邻边叉积同号（共线边不算破坏凸性）
+    let pos = 0, neg = 0;
+    for (let i = 0; i < 4; i++) {
+      const cr = cross(q[i], q[(i + 1) & 3], q[(i + 2) & 3]);
+      if (cr > 1e-9) pos++; else if (cr < -1e-9) neg++;
+    }
+    return (pos > 0 && neg === 0) || (neg > 0 && pos === 0);
+  };
+  const out = [];
+  for (let ti = 0; ti < tris.length; ti++) {
+    const t = tris[ti];
+    let merged = false;
+    for (let e = 0; e < 3 && !merged; e++) {
+      const P = t[e], Q = t[(e + 1) % 3];
+      const k = ekey(P, Q);
+      const hit = edgeMap.get(k);
+      if (!hit || done[hit.ti]) continue;
+      // 共享边 (P,Q)：两侧第三点 A（对方）与 B（自身）→ 环序 [A,P,B,Q]
+      const u = tris[hit.ti];
+      const kp = key(P), kq = key(Q);
+      let A = null;
+      for (const p of u) { const kk = key(p); if (kk !== kp && kk !== kq) { A = p; break; } }
+      const B = t[(e + 2) % 3];
+      if (!A) continue;
+      const q = [A, P, B, Q];
+      if (!convex(q)) continue;
+      done[hit.ti] = 1; done[ti] = 1;
+      edgeMap.delete(k);
+      out.push(q);
+      merged = true;
+    }
+    if (!merged) {
+      for (let e = 0; e < 3; e++) {
+        const k = ekey(t[e], t[(e + 1) % 3]);
+        if (!edgeMap.has(k)) edgeMap.set(k, { ti, P: t[e], Q: t[(e + 1) % 3] });
+      }
+    }
+  }
+  for (let ti = 0; ti < tris.length; ti++) {
+    if (!done[ti]) { const t = tris[ti]; out.push([t[0], t[1], t[2], t[2]]); }
+  }
+  return out;
 }
 
 function preFilter(pts) {
@@ -1223,15 +1478,20 @@ function stitchEnds(sk, GW, GH, maxGap, ink) {
 }
 
 function zhangSuen(ink, GW, GH) {
-  const cur = new Uint8Array(ink); const next = new Uint8Array(ink.length);
+  const cur = new Uint8Array(ink);
   const NX = [0, 1, 1, 1, 0, -1, -1, -1], NY = [-1, -1, 0, 1, 1, 1, 0, -1];
   const v = new Int32Array(8); let changed = true, iter = 0;
+  // 活跃像素集优化：判定逻辑与全图扫描版完全一致（phase 判定基准不变、del 统一应用），
+  // 但每轮只扫"上轮删除像素的邻居"。动漫图头发=巨大黑块环带，全图版每轮 2×N×64 上限直接卡死主线程。
+  let act = new Set();
+  for (let k = 0; k < cur.length; k++) if (cur[k]) act.add(k);
   while (changed && iter < 64) {
     changed = false; iter++;
     for (let phase = 0; phase < 2; phase++) {
-      next.set(cur);
-      for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-        const k = Idx(x, y, GW); if (!cur[k]) continue;
+      const del = [];
+      for (const k of act) {
+        if (!cur[k]) continue;
+        const x = k % GW, y = (k / GW) | 0;
         let B = 0;
         for (let d = 0; d < 8; d++) {
           const nx = x + NX[d], ny = y + NY[d];
@@ -1242,9 +1502,25 @@ function zhangSuen(ink, GW, GH) {
         if (A !== 1) continue;
         if (phase === 0) { if (v[0] * v[2] * v[4] !== 0) continue; if (v[2] * v[4] * v[6] !== 0) continue; }
         else { if (v[0] * v[2] * v[6] !== 0) continue; if (v[0] * v[4] * v[6] !== 0) continue; }
-        next[k] = 0; changed = true;
+        del.push(k);
       }
-      cur.set(next);
+      if (del.length) {
+        changed = true;
+        const nxt = new Set();
+        for (const k of del) {
+          cur[k] = 0;
+          const x = k % GW, y = (k / GW) | 0;
+          for (let d = 0; d < 8; d++) {
+            const nx = x + NX[d], ny = y + NY[d];
+            if (nx < 0 || nx >= GW || ny < 0 || ny >= GH) continue;
+            const nk = Idx(nx, ny, GW);
+            if (cur[nk]) nxt.add(nk);
+          }
+        }
+        act = nxt;   // 只有被删像素的邻域才可能产生新的可删点
+      } else {
+        act = new Set();
+      }
     }
   }
   return cur;
@@ -1417,7 +1693,7 @@ function weldChains(chains, R) {
 // near-white ink residues stay unfilled. Keeps component-size threshold + white
 // holes per blob.
 function buildGradFill(M, lumGW, GW, GH, opts) {
-  const { fillMin, strength, keepHoles=true, protectR=0 } = opts;  // protectR: dilate hole mask R cells -> exclude from fill (prevents eye-whites being smothered)
+  const { fillMin, strength, keepHoles=true, protectR=0, solidQuads=false } = opts;  // protectR: dilate hole mask R cells -> exclude from fill (prevents eye-whites being smothered)
   const N = GW * GH;
   // (1) component label on M (ink mask)
   const lab = new Int32Array(N).fill(-1); const sizes = []; const stk = [];
@@ -1495,13 +1771,22 @@ function buildGradFill(M, lumGW, GW, GH, opts) {
   }
   for (let c = 0; c < sizes.length; c++) if (compN[c] > 0) compMeanLum[c] /= compN[c];
   const runs = [];
+  const rowStepOf = new Uint8Array(sizes.length);
+  const solidMask = new Uint8Array(N);   // rowStep==1 的纯实心分量 → 走 drawQuads 三角剖分
+  let hasSolid = false;
   const sPow = Math.max(1, 7 - strength);      // 1 (str6) .. 6 (str1)
   for (let c = 0; c < sizes.length; c++) {
     if (!fillIDs.has(c)) continue;
     const mL = compMeanLum[c];
     const dark = 1 - Math.max(0, Math.min(1, mL / 220));
     const rawStep = 1 + Math.round((1 - dark) * sPow);
-    const rowStep = Math.max(1, Math.min(5, rawStep));
+    let rowStep = Math.max(1, Math.min(5, rawStep));
+    // quads 模式：实心由三角剖分一次搞定，没有逐行成本——较暗块（均值亮度≤110）直接整块实心。
+    // 阈值 0.7→0.5：动漫 AI 线稿的密集排线区（头发/阴影）均值亮度多在 80~120，0.7 时全漏回扫描线，
+    // 实测 reisen 图只有 1 块进 quads；放宽后密集块能走三角剖分，段数省一个量级。
+    if (solidQuads && dark >= 0.5 && rowStep > 1) rowStep = 1;
+    rowStepOf[c] = rowStep;
+    if (rowStep === 1) hasSolid = true;
     const tightLumTrim = rowStep >= 3 ? 8 : 25;   // sparse-strength mode: aggressively shrink rim halos
     for (let j = 0; j < GH; j++) {
       if ((j % rowStep) !== 0) continue;
@@ -1515,12 +1800,13 @@ function buildGradFill(M, lumGW, GW, GH, opts) {
           while (ax <= bx && lumGW[Idx(ax, j, GW)] > thr) ax++;
           while (bx >= ax && lumGW[Idx(bx, j, GW)] > thr) bx--;
         }
-        if (ax <= bx) runs.push([ax, j, bx, j]);
+        if (ax <= bx) runs.push([ax, j, bx, j, c, rowStep]);
         i = e;
       }
     }
   }
-  return { runs, blobs, holes, fillCells: runs.length, stats: { blobs, holes, strength } };
+  if (hasSolid) for (let k = 0; k < N; k++) if (bigMask[k] && rowStepOf[lab[k]] === 1) solidMask[k] = 1;
+  return { runs, blobs, holes, solidMask, fillCells: runs.length, stats: { blobs, holes, strength } };
 }
 
 // ============ background fill-white ============
@@ -2147,6 +2433,7 @@ function updateAutoTags(tags) {
   set('tagMinL', '自动 ' + tags.minLen);
   set('tagFillS', '自动 强度 ' + tags.fillStrength);
   set('tagFillM', '自动 ' + tags.fillMin);
+  set('tagFillMode', (tags.enh ? '自动 quads' : '自动 scan'));
   set('tagBg', '自动 ' + tags.bgTol);
   set('tagDeb', '自动 ' + tags.deburr + '轮');
   set('tagDAr', '自动 ' + tags.deArea + '格²');
@@ -2156,6 +2443,7 @@ function updateAutoTags(tags) {
 // ============ main convert (LINE ONLY MODE) ============
 function convert(o) {
   const t0 = performance.now();
+  window.__ph = [];   // 阶段耗时打点（诊断用）
   const cw0 = Math.max(1, Math.round(img.width * (o.cR - o.cL)));
   const ch0 = Math.max(1, Math.round(img.height * (o.cB - o.cT)));
   // 网格分辨率策略：
@@ -2219,6 +2507,7 @@ function convert(o) {
   }
 
   const { bg, bgCount } = removeBackground(lum, mm, red, mr, mg, mb, GW, GH, o);
+  window.__ph.push(['downsample+bg', Math.round(performance.now() - t0)]); console.log('[PH]', 'downsample+bg', window.__ph[window.__ph.length - 1][1]);
   const content = new Uint8Array(N);
   for (let k = 0; k < N; k++) content[k] = bg[k] ? 0 : 1;
 
@@ -2261,20 +2550,101 @@ function convert(o) {
   };
 
   const applyFill = (srcM, srcLumGrid) => {
+    console.log('[PH]', 'applyFill enter', Math.round(performance.now() - t0));
     if (!o.fillOn || o.fillStrength < 1 || capped || !srcM) return;
-    const sf = buildGradFill(srcM, srcLumGrid, GW, GH, { fillMin: o.fillMin, strength: o.fillStrength, keepHoles: true, protectR: Math.max(0, Math.min(8, Math.round(o.protectR || 0))) });
+    const sf = buildGradFill(srcM, srcLumGrid, GW, GH, { fillMin: o.fillMin, strength: o.fillStrength, keepHoles: true, protectR: Math.max(0, Math.min(8, Math.round(o.protectR || 0))), solidQuads: o.fillMode === 'quads' });
+    console.log('[PH]', 'buildGradFill done', Math.round(performance.now() - t0), 'blobs', sf.blobs, 'solidCells', sf.solidMask ? sf.solidMask.reduce(function(a, b) { return a + b; }, 0) : 0);
     fillBlobs = sf.blobs; fillHoles = sf.holes; fillUsedStrength = o.fillStrength;
+    // ---- 实心四边形路径：实心分量（rowStep==1 纯黑块 ∪ 原图暗区还原掩码）→ 三角剖分 → drawQuads ----
+    // 官方动漫瞄具同款语法；同等面积比扫描线省 10~50 倍段数，剩余预算让给线条细节。
+    // 稀疏阴影（rowStep>=2）仍走扫描线排线，保留明暗层次。
+    // 注意 quads 只看格子形状、不看亮度：暗区格子与描边连通后组件均亮会被 rowStep 判定刷掉，
+    // 所以 o._darkMask（原图暗区）必须直接并入剖分来源，不能指望 rowStep==1。
+    const quadSrcM = (o._darkMask && sf.solidMask)
+      ? (() => { const m = new Uint8Array(N); for (let k = 0; k < N; k++) if (sf.solidMask[k] || o._darkMask[k]) m[k] = 1; return m; })()
+      : (o._darkMask || sf.solidMask);
+    const useQuads = o.fillMode === 'quads' && !!quadSrcM;
+    const quadDoneComps = new Set();
+    const quadCellMask = new Uint8Array(N);   // 已被 quads 覆盖的格子（行段去重用，runs 循环在 if 块外也要用）
+    let quadCount = 0, quadBytes = 0, quadBlobN = 0, quadFailBlobs = 0, quadSkipBlobs = 0;
+    o.quads = o.quads || '';
+    const quadTris = [];   // 预览用（网格坐标）
+    if (useQuads) {
+      // quadSrcM 连通域标记 + 收集单元
+      const compId = new Int32Array(N).fill(-1);
+      const ccells = [];
+      const stk2 = [];
+      for (let k0 = 0; k0 < N; k0++) {
+        if (!quadSrcM[k0] || compId[k0] >= 0) continue;
+        const id = ccells.length;
+        const cells = [k0]; compId[k0] = id; stk2.push(k0);
+        while (stk2.length) {
+          const k = stk2.pop(); const ki = k % GW, kj = (k / GW) | 0;
+          const tryN = nk => { if (quadSrcM[nk] && compId[nk] < 0) { compId[nk] = id; cells.push(nk); stk2.push(nk); } };
+          if (ki > 0) tryN(k - 1);
+          if (ki < GW - 1) tryN(k + 1);
+          if (kj > 0) tryN(k - GW);
+          if (kj < GH - 1) tryN(k + GW);
+        }
+        ccells.push(cells);
+      }
+      const QUAD_AREA_MIN = Math.max(24, Math.round((o.fillMin || 150) * 0.5));
+      const QUAD_BYTE_BUDGET = Math.floor(BLK_SIZE_LIMIT * 0.55);
+      // 段数配额：quads 每块仅 ~50-200 条（轮廓简化后与面积无关），5800 ≈ 30+ 块全覆盖。
+      // 不再从 segs.length 里扣——被 quad 覆盖的扫描线行段会被覆盖去重跳过、细节线由
+      // sizeBudget 体积回路自适应收缩，MAXSEG 硬上限由 flushSegs 兜底。
+      const QUAD_COUNT_MAX = 5800;
+      const order = [];
+      for (let id = 0; id < ccells.length; id++) if (ccells[id].length >= QUAD_AREA_MIN) order.push({ id, area: ccells[id].length });
+      order.sort((a, b) => b.area - a.area);   // 大块优先拿预算
+      const tmpMask = new Uint8Array(N);
+      for (const ent of order) {
+        if (quadCount >= QUAD_COUNT_MAX || quadBytes >= QUAD_BYTE_BUDGET) { quadSkipBlobs++; continue; }
+        tmpMask.fill(0);
+        for (const k of ccells[ent.id]) tmpMask[k] = 1;
+        const tris = solidBlobTriangles(tmpMask, GW, GH, Math.max(1.0, o.dpEps * (o.complex ? 1.2 : 1.3)));
+        if (!tris || !tris.length) { quadFailBlobs++; continue; }
+        // 相邻三角对合并为凸四边形：同面积数量/体积约砍半。复杂图 eps 略收紧（1.2 vs 1.3），发丝边缘更贴
+        const shapes = mergeTrisToQuads(tris);
+        // 整块 all-or-nothing：装不下就整块回退扫描线，避免同一黑块半 quads 半排线
+        if (quadBytes + shapes.length * 160 > QUAD_BYTE_BUDGET || quadCount + shapes.length > QUAD_COUNT_MAX) { quadSkipBlobs++; continue; }
+        for (const q of shapes) {
+          let A = q[0], B = q[1], C = q[2], D = q[3];
+          // 文件坐标 shoelace 与官方动漫瞄具同号（负），防潜在的背面剔除差异
+          if ((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]) > 0) { const r = q.slice().reverse(); A = r[0]; B = r[1]; C = r[2]; D = r[3]; }
+          const gx = v => o.x0 + v[0] / GW * o.w + WT_X_OFFSET;
+          const gy = v => o.y0 * Y_BLK_SCALE + (v[1] / GH) * artH - WT_Y_CENTER;
+          const s = '  quad{tl:p2=' + F(gx(A)) + ',' + F(gy(A)) + ';tr:p2=' + F(gx(B)) + ',' + F(gy(B)) + ';br:p2=' + F(gx(C)) + ',' + F(gy(C)) + ';bl:p2=' + F(gx(D)) + ',' + F(gy(D)) + ';}\n';
+          o.quads += s;
+          quadBytes += s.length; quadCount++;
+          quadTris.push(q);
+        }
+        quadDoneComps.add(ent.id);
+        for (const k of ccells[ent.id]) quadCellMask[k] = 1;
+        quadBlobN++;
+      }
+      o._quadTris = quadTris;
+      console.log('[PH]', 'quadLoop done', Math.round(performance.now() - t0), JSON.stringify(o._quadInfo));
+    }
     // 填充降采样：密度对标 sijisight。
     // strength ≥ 4 : STEP = 1（满行密扫，大色块专用）
     // strength = 2~3 : STEP = 1（默认：完整填充，中灰度渐变密度）
     // strength = 1   : STEP = 2（纯线稿稀疏档，每 2 行扫 1 行，省 ~50% 填充段）
     // —— AI 线稿场景（inkRatio<0.12）autoTune 会给 strength=2，这里给 STEP=2 防止填充段爆容量
     //    （实测 aya_source AI 线稿 820×1500：STEP=1 填 8200 段 / raw963KB，STEP=2 → ~4500段/650KB，完整徽章✓）
+    // quads 模式下已成功的实心分量不再发扫描线（预算换给线条）
     const STEP_ROWS = (o.fillStrength <= 1) ? 2 : ((o.fillStrength === 2 && !o.__forceFillDense) ? 2 : 1);
     let lastAy = -(STEP_ROWS + 1);
     for (let ri = 0; ri < sf.runs.length; ri++) {
       const r = sf.runs[ri];
       const ax = r[0], ay = r[1], bx = r[2], by = r[3];
+      if (useQuads && quadDoneComps.has(r[4])) continue;
+      if (useQuads && quadCellMask) {
+        // quads 已覆盖的行段不再发扫描线（黑上画黑纯浪费字节）：行段内 ≥55% 格子被覆盖即跳过
+        let cov = 0, tot = 0;
+        for (let x = ax; x <= bx; x++) { tot++; if (quadCellMask[ay * GW + x]) cov++; }
+        if (tot > 0 && cov >= tot * 0.55) continue;
+      }
       if (STEP_ROWS > 1) {
         const ayInt = Math.floor(ay);
         if (ayInt === lastAy) continue;
@@ -2289,8 +2659,9 @@ function convert(o) {
       polylines.push({ p: [[ax, ay], [bx, by]], closed: false, fill: true });
       fillRuns++;
     }
+    o._quadInfo = { quads: quadCount, bytes: quadBytes, blobs: quadBlobN, fail: quadFailBlobs, skip: quadSkipBlobs, active: useQuads };
   };
-  const emitPolyline = (pts, closed) => {
+  const emitPolyline = (pts, closed, cacheP) => {
     // LINE_STEP=1：不跳顶点，配合更高 dpEps 实现同段数下更高精度（角点不被切）
     const LINE_STEP = 1;
     const lim = closed ? pts.length : pts.length - 1;
@@ -2305,7 +2676,8 @@ function convert(o) {
     }
     // 将整条原始轮廓 polyline （未经 LINE_STEP 跳点） 缓存到 polylines 里，供 sight / mini 预览渲染"空线框轮廓"——
     // 这样预览就能看到完整的人物轮廓细节，而不是只靠小段组合。
-    polylines.push({ p: pts.slice(), closed: !!closed, fill: false, outline: true });
+    // cacheP===false：体积预算重发时跳过缓存（预览保持 pass-0 细节，避免重复 push）
+    if (cacheP !== false) polylines.push({ p: pts.slice(), closed: !!closed, fill: false, outline: true });
   };
 
   // ---- centerline mode (only mode now) ----
@@ -2404,7 +2776,16 @@ function convert(o) {
     if (dist[k] >= HOLLOW && maxD[lab[k]] >= THICK) band[k] = 0;
   }
 
-  const pre = pruneSpurs(thinTo1px(zhangSuen(band, GW, GH), GW, GH), GW, GH, 6);
+  window.__ph.push(['ink+cc+band', Math.round(performance.now() - t0)]); console.log('[PH]', 'ink+cc+band', window.__ph[window.__ph.length - 1][1]);
+  const zIn = performance.now();
+  const zs = zhangSuen(band, GW, GH);
+  console.log('[PH]', 'zhangSuen', Math.round(performance.now() - zIn));
+  const ttIn = performance.now();
+  const t1 = thinTo1px(zs, GW, GH);
+  console.log('[PH]', 'thinTo1px', Math.round(performance.now() - ttIn));
+  const pre = pruneSpurs(t1, GW, GH, 6);
+  window.__ph.push(['skeleton', Math.round(performance.now() - t0)]); console.log('[PH]', 'skeleton', window.__ph[window.__ph.length - 1][1]);
+  const stIn = performance.now();
   let st = stitchEnds(pre, GW, GH, 6, band);
   if (st.n > 0) { const st2 = stitchEnds(st.m, GW, GH, 6, band); st = { m: st2.m, n: st.n + st2.n }; }
   const sk = st.m;
@@ -2416,15 +2797,119 @@ function convert(o) {
     if (s.length >= 2) smooth.push(s);
   }
   const weldedN = weldChains(smooth, 2.5);
-  // ===== 先把填充 + 中心线全部收进 segs[] 做 Y 升序排序后统一写入 drawLines =====
+  console.log('[PH]', 'stitch+paths+smooth', Math.round(performance.now() - stIn), 'paths', paths.length, 'smooth', smooth.length);
+  window.__ph.push(['stitch+paths+smooth', Math.round(performance.now() - t0)]);
+  // ===== 中心线先入队，填充随后（quads 预算需要已知线条段数），Y 升序排序统一写入 =====
   // 理由：若先填后轮廓（或反序），正 Y 的腿/裙区会集中在文件尾，遇 WT 静默截断尾部时就会"只丢下半截"。
-  //       按 Y 升序（顶→底）写，截断时仅丢最底部脚尖。格式仍严格对标 siji。
-  applyFill(inkD, fillLum);
+  //       按 Y 升序（顶→底）写，截断时仅丢最底部脚尖。quads 独立成块，不参与 flush。
   for (const s of smooth) {
     polylines.push({ p: s, closed: false });
     emitPolyline(s, false);
   }
+  console.log('[PH]', 'emitLines', Math.round(performance.now() - t0), 'segs', segs.length);
+  const detailSegN0 = segs.length;
+  // ===== 动漫暗区还原：AI 线稿只有黑白线条，原图的色块明暗在「应用线稿」时就丢了 =====
+  // 用 srcOriginal（应用前的原始彩图）找线稿里被墨线封闭的白区；该区域在原图中足够暗
+  // （头发/眼睛/服装阴影）→ 并回填充掩码且亮度换成原图值 → buildGradFill 判为暗块
+  // → rowStep=1 → 走 drawQuads 实心或满行扫描线，动漫的"黑发黑瞳"才立得起来。
+  // 封闭性泄漏只会导致漏检（区域连通到背景），不会误检，安全。
+  let darkRegions = 0, darkRegionCells = 0, fillSrcM = inkD, fillLumG = fillLum;
+  if (o.srcOriginal && o.fillOn && o.fillStrength >= 1) {
+    try {
+      const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
+      const og2 = oc.getContext('2d', { willReadFrequently: true });
+      og2.imageSmoothingEnabled = true; og2.imageSmoothingQuality = 'high';
+      og2.drawImage(o.srcOriginal,
+        o.cL * o.srcOriginal.width, o.cT * o.srcOriginal.height,
+        Math.max(1, Math.round(o.srcOriginal.width * (o.cR - o.cL))),
+        Math.max(1, Math.round(o.srcOriginal.height * (o.cB - o.cT))),
+        0, 0, GW, GH);
+      const od = og2.getImageData(0, 0, GW, GH).data;
+      const origLum = new Float64Array(N);
+      for (let k = 0; k < N; k++) { const p = k * 4; origLum[k] = 0.299 * od[p] + 0.587 * od[p + 1] + 0.114 * od[p + 2]; }
+      // 原图边缘 8% 边框均值 ≈ 背景亮度 → 暗区阈值（纯白底 240×0.42≈100：黑发/深色瞳稳进，中灰阴影不进）
+      let bgSum = 0, bgN = 0;
+      const bx = Math.max(1, Math.round(GW * 0.08)), by = Math.max(1, Math.round(GH * 0.08));
+      for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+        if (i > bx && i < GW - bx && j > by && j < GH - by) continue;
+        bgSum += origLum[Idx(i, j, GW)]; bgN++;
+      }
+      const DARK_THR = Math.max(60, Math.min(140, (bgN ? bgSum / bgN : 255) * 0.42));
+      // 泛洪：从网格边界走所有白格（非墨）；走不到的白格 = 被墨线封闭的区域
+      const reach = new Uint8Array(N);
+      const stk = [];
+      const pushW = k => { if (!inkD[k] && !reach[k]) { reach[k] = 1; stk.push(k); } };
+      for (let i = 0; i < GW; i++) { pushW(i); pushW(Idx(i, GH - 1, GW)); }
+      for (let j = 0; j < GH; j++) { pushW(Idx(0, j, GW)); pushW(Idx(GW - 1, j, GW)); }
+      while (stk.length) {
+        const k = stk.pop(), ki = k % GW, kj = (k / GW) | 0;
+        if (ki > 0) pushW(k - 1);
+        if (ki < GW - 1) pushW(k + 1);
+        if (kj > 0) pushW(k - GW);
+        if (kj < GH - 1) pushW(k + GW);
+      }
+      // 封闭白区连通域 → 逐区域统计原图平均亮度，够暗的标记为待填充
+      const regId = new Int32Array(N).fill(-1);
+      const regs = [];
+      for (let k0 = 0; k0 < N; k0++) {
+        if (inkD[k0] || reach[k0] || regId[k0] >= 0) continue;
+        const id = regs.length; const cells = [k0]; regId[k0] = id;
+        const st2 = [k0];
+        while (st2.length) {
+          const k = st2.pop(), ki = k % GW, kj = (k / GW) | 0;
+          const tryN = nk => { if (!inkD[nk] && !reach[nk] && regId[nk] < 0) { regId[nk] = id; cells.push(nk); st2.push(nk); } };
+          if (ki > 0) tryN(k - 1);
+          if (ki < GW - 1) tryN(k + 1);
+          if (kj > 0) tryN(k - GW);
+          if (kj < GH - 1) tryN(k + GW);
+        }
+        regs.push(cells);
+      }
+      const MIN_DARK_CELLS = Math.max(12, Math.round(N * 0.00004));   // 太小=噪点/灰阶碎屑
+      const holeMask = new Uint8Array(N);
+      for (const cells of regs) {
+        if (cells.length < MIN_DARK_CELLS) continue;
+        let s = 0; for (const k of cells) s += origLum[k];
+        if (s / cells.length > DARK_THR) continue;
+        for (const k of cells) holeMask[k] = 1;
+        darkRegions++; darkRegionCells += cells.length;
+      }
+      if (darkRegions) {
+        fillSrcM = new Uint8Array(inkD);
+        fillLumG = Float64Array.from(fillLum);
+        for (let k = 0; k < N; k++) if (holeMask[k]) { fillSrcM[k] = 1; fillLumG[k] = origLum[k]; }
+        o._darkMask = holeMask;   // quads 剖分来源直并暗区格子（不依赖 rowStep 亮度判定）
+      }
+      console.log('[PH]', 'darkRegion', 'thr', Math.round(DARK_THR), 'regions', darkRegions, 'cells', darkRegionCells);
+    } catch (e) { console.warn('[PH] darkRegion failed', e); }
+  }
+  applyFill(fillSrcM, fillLumG);
+  window.__ph.push(['applyFill', Math.round(performance.now() - t0)]); console.log('[PH]', 'applyFill', window.__ph[window.__ph.length - 1][1], 'quads', JSON.stringify(o._quadInfo));
+  // ===== 全局体积预算：细节线按剩余字节自适应重简化，杜绝裁尾丢下半身 =====
+  // 动漫图细节线动辄上万段（≈67B/段），直接塞满 853KB 上限后 trimBlkToSize 会砍掉尾部
+  // （实测 reisen 图裁掉 149.9KB，下半身直接消失）。填充段/quads 此时已定稿，
+  // 唯一可无损压缩的是细节线：对已提取的中心线放大 eps 重简化（不重跑 zhangSuen/分割等重阶段），
+  // 单轮毫秒级，最多 4 轮。4 轮后仍超限才走原有裁尾兜底。
+  const fillSegs = segs.splice(detailSegN0);   // 摘出填充段，segs 只剩细节段
+  const BLK_OVERHEAD_EST = 3500;               // crosshair_distances + 头尾杂项的保守估计
+  let budgetPasses = 0, detailCur = smooth, budgetEps = o.dpEps;
+  for (;;) {
+    segs.length = 0;
+    for (const s of detailCur) emitPolyline(s, false, false);
+    for (const fs of fillSegs) segs.push(fs);
+    let bytes = BLK_OVERHEAD_EST + (o.quads ? o.quads.length : 0);
+    for (const s of segs) bytes += s[1].length;
+    if (bytes <= BLK_SIZE_LIMIT || budgetPasses >= 4 || !detailCur.length) break;
+    budgetPasses++;
+    budgetEps = o.dpEps * Math.pow(1.45, budgetPasses);
+    detailCur = [];
+    for (const s of smooth) { const r = dpOpen(s, budgetEps); if (r.length >= 2) detailCur.push(r); }
+  }
+  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2));
   flushSegs();
+  window.__ph.push(['flush', Math.round(performance.now() - t0)]); console.log('[PH]', 'flush', window.__ph[window.__ph.length - 1][1], 'segs', segCount);
+  const quadInfo = o._quadInfo || { quads: 0, bytes: 0, blobs: 0, fail: 0, skip: 0, active: false };
+  if (quadInfo.quads > 0) segCount += quadInfo.quads;   // 统计口径：quads 计入总段数
   o.stats = '阈值 ' + T + (br ? ' · 桥接 ' + br + ' 格' : ' · 无桥接') + ' · 填洞 ' + filledHoles + ' · 缝合 ' + st.n + ' · 焊接 ' + weldedN;
   // diagnostics
   {
@@ -2433,6 +2918,9 @@ function convert(o) {
     o.stats += ' · ink ' + inkArea + ' → band ' + bandArea + ' · 分量 ' + sizes.length + '(挖空' + bigBlobs + ') · 路径 ' + paths.length;
   }
   if (fillRuns > 0) o.stats += ' · 填块 ' + fillBlobs + '(' + fillHoles + '洞) · 强度 ' + fillUsedStrength + ' · 扫描线 ' + fillRuns;
+  if (darkRegions) o.stats += ' · 原图暗区 ' + darkRegions + ' 块(' + Math.round(darkRegionCells / N * 100) + '%)';
+  if (quadInfo.active) o.stats += ' · 实心quads ' + quadInfo.quads + '(' + quadInfo.blobs + '块' + (quadInfo.fail ? ' · 回退' + quadInfo.fail : '') + (quadInfo.skip ? ' · 超预算跳过' + quadInfo.skip : '') + ') ' + Math.round(quadInfo.bytes / 1024) + 'KB';
+  if (budgetPasses) o.stats += ' · 体积自适应 ' + budgetPasses + ' 轮(eps→' + budgetEps.toFixed(2) + ')';
   if (capped) o.stats += ' · ⚠ ' + (capReason || ('已达安全段数上限（理论最大值，几乎不会触发），降网格或关填充可释放余量'));
   o.fillStats = { blobs: fillBlobs, holes: fillHoles, strength: fillUsedStrength, scanLines: fillRuns };
 
@@ -2448,6 +2936,17 @@ function convert(o) {
   g.fillStyle = '#fff'; g.fillRect(0, 0, pw, ph);
   g.imageSmoothingEnabled = false;
   g.strokeStyle = '#111'; g.lineJoin = 'round'; g.lineCap = 'round';
+  // 实心 quads 预览：单 path 批量填充，和游戏内渲染观感一致（实心色块）
+  if (o._quadTris && o._quadTris.length) {
+    g.fillStyle = '#111';
+    g.beginPath();
+    for (const t of o._quadTris) {
+      g.moveTo(t[0][0] / GW * pw, t[0][1] / GH * ph);
+      for (let i = 1; i < 4; i++) g.lineTo(t[i][0] / GW * pw, t[i][1] / GH * ph);
+      g.closePath();
+    }
+    g.fill();
+  }
   // fill 段：水平扫描线，细密细线 —— 与 WT drawLines 单条线宽对齐
   g.lineWidth = 1.0;
   for (const pl of polylines) {
@@ -2488,6 +2987,13 @@ function convert(o) {
   // assemble blk
   const L = blkHeader(o);
   pushDrawTexts(L, o);
+  // drawQuads 独立成块（官方动漫瞄具同款）。放在 drawLines 之前：
+  // 超体积裁尾只发生在 drawLines 尾部，quads 永远保持结构闭合。
+  if (o.quads && o.quads.length) {
+    L.push('drawQuads{');
+    L.push(o.quads);
+    L.push('}');
+  }
   L.push('drawLines{');
   L.push(o.lines);
   L.push('}');
@@ -3779,20 +4285,29 @@ function resolveOptions(img, auto) {
   const v_deArea = v_deAreaUI === 0 ? auto.deArea : v_deAreaUI;
   const v_protectRUI = Math.max(0, Math.min(8, Math.round(num('protectR') || 0)));
   const v_protectR = v_protectRUI === 0 ? auto.protectR : v_protectRUI;
+  // 填充方式：auto = 复杂图（边缘密度阈值判定）用 drawQuads 实心填充，简单图走传统扫描线
+  const v_fillModeUI = $('fillMode') ? $('fillMode').value : 'auto';
+  const v_fillMode = v_fillModeUI === 'auto'
+    ? ((auto.diagnostics && auto.diagnostics.complex) ? 'quads' : 'scan')
+    : v_fillModeUI;
   const o = {
     cL, cT, cR, cB,
     gridW: v_gridW, dpEps: v_dpEps, thrOff: v_thrOff,
     bridge: v_bridge, minLen: v_minLen,
     deburr: v_deburr, deArea: v_deArea,
     fillOn: $('fillOn').checked,
+    fillMode: v_fillMode,
+    complex: !!(auto.diagnostics && auto.diagnostics.complex),
     fillStrength: v_fillStrengthEff, fillMin: v_fillMin, protectR: v_protectR,
     bgTol: v_bgTol,
+    srcOriginal: srcOriginal || null,   // 动漫暗区还原用；无则跳过该特性
     bgV1: $('bgV1').checked, bgAggr: $('bgAggr').checked,
     x0: sight.x0, y0: sight.y0, w: sight.w,
     cross: $('cross').checked,
     mark: $('mark').value.trim(),
     mode: 'line',
-    lines: ''
+    lines: '',
+    quads: ''
   };
   return {
     auto, cL, cT, cR, cB,
@@ -4082,7 +4597,7 @@ if ($('dlManual')) $('dlManual').onclick = () => {
 // ============ debug hooks (preserved) ============
 window.__load = url => new Promise(res => {
   const im = new Image();
-  im.onload = () => { img = im; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
+  im.onload = () => { img = im; srcOriginal = im; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
   im.src = url;
 });
 window.__run = ov => {

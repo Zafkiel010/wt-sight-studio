@@ -2046,7 +2046,9 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
     if (gx > 26 || gy > 26) edgeCount++;
   }
   const edgeRatio = edgeCount / Math.max(1, N);
-  const complex = edgeRatio > 0.25;   // 复杂图：启用精细配置曲线
+  // 阈值按实测校准（640px 分析宽）：默认瞄具 0.105 / 一般动漫图 0.108 / 精细复杂插画 0.147
+  // 动漫线稿是细线+大色块，edgeRatio 天然远低于照片，0.25 会漏判所有二次元图
+  const complex = edgeRatio > 0.13;   // 复杂图：启用精细配置曲线
   // --- gridW auto ---
   // Base = 800, +complexity -> 1000..1400.
   // Complex drivers: small pixels (high ink area / lots of contrast), content not too-dense.
@@ -2057,7 +2059,7 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (contrast > 90 && inkRatio < 0.45) gridW += 100;  // sharp lines: push detail
   if (inkRatio > 0.6) gridW -= 120;                     // huge solid areas: less detail needed
   if (complex) gridW = Math.max(gridW, 1200);           // 复杂图：精度优先
-  if (edgeRatio > 0.40) gridW = Math.max(gridW, 1400);  // 极复杂（密集发丝）：再上一档
+  if (edgeRatio > 0.20) gridW = Math.max(gridW, 1400);  // 极复杂（密集发丝）：再上一档（实测动漫图很难超过 0.25，原 0.40 永远触发不了）
   gridW = Math.max(400, Math.min(complex ? 1400 : 900, gridW));
   // --- dpEps auto: keep constant screen-space precision ---
   // Target = 0.45 grid cells. Larger grid -> bigger eps in cell units.

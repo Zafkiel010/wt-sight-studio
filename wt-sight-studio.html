@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WT Sight Studio · 战雷瞄具生成器 [Alpha]</title>
+<!-- Unlock SharedArrayBuffer for ONNX multi-threading on headerless hosts (GitHub Pages) -->
+<script src="coi-serviceworker.js"></script>
 <style>
   :root { --bg:#14171c; --panel:#1d222a; --line:#2c3440; --txt:#d8dee6; --dim:#8a94a3; --acc:#e8b04a; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1644,31 +1646,49 @@ function loadOrt() {
   return ortReady;
 }
 const sketchSessions = {};
+const modelBytesCache = {};  // 内存级字节缓存（本次会话内复用）
 // 带进度显示的模型下载（避免网慢时永远卡在"正在加载模型"）
-async function fetchModelWithProgress(url, label) {
+// 模型会持久缓存到 Cache API —— 首次下载后，之后的访问零等待
+async function fetchModelWithProgress(url, label, silent) {
+  let cache = null;
+  try { cache = await caches.open('wt-ss-models'); } catch (e) { /* file:// 或不支持则跳过 */ }
+  if (cache) {
+    try {
+      const hit = await cache.match(url);
+      if (hit) {
+        if (!silent) setStatus('读取缓存模型 ' + label + '…', 'busy');
+        const buf = await hit.arrayBuffer();
+        return new Uint8Array(buf);
+      }
+    } catch (e) { }
+  }
+  if (modelBytesCache[url]) return modelBytesCache[url];
   const res = await fetch(url);
   if (!res.ok) throw new Error('模型下载失败 HTTP ' + res.status + '：' + url);
   const total = +(res.headers.get('content-length') || 0);
+  let bytes;
   if (!res.body || !total) {
-    const buf = await res.arrayBuffer();
-    return new Uint8Array(buf);
-  }
-  const reader = res.body.getReader();
-  const chunks = []; let got = 0, lastUpd = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value); got += value.length;
-    const now = performance.now();
-    if (now - lastUpd > 300) {
-      lastUpd = now;
-      setStatus('正在下载模型 ' + label + ' ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB…', 'busy');
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } else {
+    const reader = res.body.getReader();
+    const chunks = []; let got = 0, lastUpd = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value); got += value.length;
+      const now = performance.now();
+      if (now - lastUpd > 300 && !silent) {
+        lastUpd = now;
+        setStatus('正在下载模型 ' + label + ' ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB…', 'busy');
+      }
     }
+    bytes = new Uint8Array(got);
+    let off = 0;
+    for (const ch of chunks) { bytes.set(ch, off); off += ch.length; }
   }
-  const buf = new Uint8Array(got);
-  let off = 0;
-  for (const ch of chunks) { buf.set(ch, off); off += ch.length; }
-  return buf;
+  modelBytesCache[url] = bytes;
+  if (cache) { try { await cache.put(url, new Response(bytes.slice().buffer)); } catch (e) { } }
+  return bytes;
 }
 async function getSketchSession(name) {
   if (sketchSessions[name]) return sketchSessions[name];
@@ -1678,13 +1698,24 @@ async function getSketchSession(name) {
   }
   const ort = await loadOrt();
   ort.env.wasm.wasmPaths = new URL('ort/', location.href).href;
-  ort.env.wasm.numThreads = 1;
+  // 多线程：需要跨域隔离（COOP/COEP）。本地 _serve.ps1 直接带这些头；
+  // GitHub Pages 由 coi-serviceworker.js 注入。未隔离时回退单线程。
+  if (self.crossOriginIsolated && (navigator.hardwareConcurrency || 1) > 2) {
+    ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency - 1);
+  } else {
+    ort.env.wasm.numThreads = 1;
+  }
   const t0 = performance.now();
   const bytes = await fetchModelWithProgress('model/' + name + '.onnx', name);
   setStatus('正在初始化模型 ' + name + '…', 'busy');
   const sess = await ort.InferenceSession.create(bytes, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
   sketchSessions[name] = sess;
-  console.log('模型加载', name, ((performance.now() - t0) / 1000).toFixed(1) + 's');
+  console.log('模型加载', name, ((performance.now() - t0) / 1000).toFixed(1) + 's',
+    'threads=' + ort.env.wasm.numThreads, 'isolated=' + self.crossOriginIsolated);
+  // 主模型就绪后，后台静默预取增强模型（选了 enhanced 就不用再等 8MB）
+  if (name === 'line-drawings' && !sketchSessions['line-relifer']) {
+    fetchModelWithProgress('model/line-relifer.onnx', 'line-relifer', true).catch(() => { });
+  }
   return sess;
 }
 async function aiSketch(apply) {

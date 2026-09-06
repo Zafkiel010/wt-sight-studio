@@ -525,11 +525,11 @@ document.addEventListener('click', e => {
         <div class="f"><label>σ2 模糊半径（1.0~5.0，默认 2.4）</label><input type="number" id="xdogS2" value="2.4" min="1.0" max="5.0" step="0.1"></div>
         <div class="f"><label>φ 锐度增强（10~80，默认 30）</label><input type="number" id="xdogPhi" value="30" min="10" max="80" step="5"></div>
         <div class="f"><label>ε 黑白阈值（0~0.3，默认 0.05）</label><input type="number" id="xdogEps" value="0.05" min="0" max="0.3" step="0.01"></div>
-        <div class="f"><label>处理尺寸·长边（0=原图）</label><input type="number" id="skSize" value="1024" min="256" max="2048" step="128"></div>
+        <div class="f"><label>处理尺寸·长边（0=原图，最大 4096）</label><input type="number" id="skSize" value="0" min="0" max="4096" step="128"></div>
         <div class="row"><button id="skDl" class="ghost">下载线稿 PNG</button></div>
 
         <h3>转换 · 精度</h3>
-        <div class="f"><label>网格宽度（精度，200~1600）</label><input type="number" id="gridW" value="0" min="0" max="1600" step="20"><span class="auto-tag" id="tagGridW">自动</span></div>
+        <div class="f"><label>网格宽度（精度，200~2400）</label><input type="number" id="gridW" value="0" min="0" max="2400" step="20"><span class="auto-tag" id="tagGridW">自动</span></div>
         <div class="f"><label>简化度 eps（越小越精细）</label><input type="number" id="dpEps" value="0" min="0" max="3" step="0.1"><span class="auto-tag" id="tagDp">自动</span></div>
         <div class="f"><label>墨线阈值偏移（-60~60）</label><input type="number" id="thrOff" value="0" min="-60" max="60" step="5"><span class="auto-tag" id="tagThr">自动</span></div>
         <div class="f"><label>断线桥接（格，0=关）</label><input type="number" id="bridge" value="-1" min="-1" max="3" step="1"><span class="auto-tag" id="tagBr">自动</span></div>
@@ -1722,8 +1722,9 @@ async function aiSketch(apply) {
   const size = num('skSize');
   const enh = $('skModel').value.indexOf('enh') >= 0;
   let W = img.width, H = img.height;
-  const s = size > 0 ? size : Math.max(W, H);
-  const k = Math.min(1, s / Math.max(W, H));
+  const maxSide = Math.min(4096, size > 0 ? size : Math.max(W, H));
+  // 允许放大（小图在更大画布上推理能出更细线条），上限 4096
+  const k = maxSide / Math.max(W, H);
   W = Math.max(8, Math.round(W * k / 8) * 8); H = Math.max(8, Math.round(H * k / 8) * 8);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
@@ -1758,6 +1759,8 @@ async function aiSketch(apply) {
     for (let i = 0; i < arr.length; i++) a3[i] = (arr[i] + 1) / 2;
     arr = a3;
   }
+  // 渲染到 canvas
+  c.width = OW; c.height = OH;
   const od = g.createImageData(OW, OH);
   const dd = od.data;
   for (let p = 0, i = 0; p < arr.length; p++, i += 4) {
@@ -1765,6 +1768,25 @@ async function aiSketch(apply) {
     dd[i] = dd[i + 1] = dd[i + 2] = v; dd[i + 3] = 255;
   }
   g.putImageData(od, 0, 0);
+  // Unsharp Mask 锐化后处理：让线条边缘更锐利、减少模糊
+  // 原理：sharpened = original + amount * (original - blurred)
+  // 只在分辨率 >= 512 时启用（小图锐化可能引入过冲）
+  if (Math.min(OW, OH) >= 512) {
+    const blurCanvas = document.createElement('canvas');
+    blurCanvas.width = OW; blurCanvas.height = OH;
+    const bg = blurCanvas.getContext('2d');
+    bg.filter = 'blur(1.2px)';
+    bg.drawImage(c, 0, 0);
+    const blurred = bg.getImageData(0, 0, OW, OH);
+    const orig = g.getImageData(0, 0, OW, OH);
+    const amt = 0.8;  // 锐化强度 0.5~1.5 之间，默认 0.8 比较安全
+    const o = orig.data, b = blurred.data;
+    for (let i = 0; i < o.length; i += 4) {
+      const diff = (o[i] - b[i]) * amt;
+      o[i] = o[i + 1] = o[i + 2] = Math.max(0, Math.min(255, o[i] + diff));
+    }
+    g.putImageData(orig, 0, 0);
+  }
   const secs = ((performance.now() - t0) / 1000).toFixed(1);
   lastSketchUrl = c.toDataURL('image/png');
   $('skDl').disabled = false;

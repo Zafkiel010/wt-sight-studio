@@ -2836,28 +2836,44 @@ function convert(o) {
       }
       const DARK_THR = Math.max(60, Math.min(140, (bgN ? bgSum / bgN : 255) * 0.42));
       // 泛洪：从网格边界走所有白格（非墨）；走不到的白格 = 被墨线封闭的区域
+      // 用 8 连接（含对角）让泄漏路径更难绕走，再加 1 次 4 连接膨胀容忍 1px 间隙——
+      // AI 线稿眼部轮廓常有 1px 断线，4 连接会让泄漏路径进来把眼睛吞并，8+膨胀后真正封闭的眼睛区域才留下
       const reach = new Uint8Array(N);
       const stk = [];
       const pushW = k => { if (!inkD[k] && !reach[k]) { reach[k] = 1; stk.push(k); } };
       for (let i = 0; i < GW; i++) { pushW(i); pushW(Idx(i, GH - 1, GW)); }
       for (let j = 0; j < GH; j++) { pushW(Idx(0, j, GW)); pushW(Idx(GW - 1, j, GW)); }
+      const NEI = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];   // 8 邻居
       while (stk.length) {
         const k = stk.pop(), ki = k % GW, kj = (k / GW) | 0;
-        if (ki > 0) pushW(k - 1);
-        if (ki < GW - 1) pushW(k + 1);
-        if (kj > 0) pushW(k - GW);
-        if (kj < GH - 1) pushW(k + GW);
+        for (const [di, dj] of NEI) {
+          const ni = ki + di, nj = kj + dj;
+          if (ni < 0 || ni >= GW || nj < 0 || nj >= GH) continue;
+          pushW(Idx(ni, nj, GW));
+        }
       }
-      // 封闭白区连通域 → 逐区域统计原图平均亮度，够暗的标记为待填充
+      // 1 次膨胀：reach 边界附近 1px 内的白格也"视为可达"，消除间隙泄漏
+      const dilatedReach = new Uint8Array(reach);
+      for (let k = 0; k < N; k++) {
+        if (!reach[k]) continue;
+        const ki = k % GW, kj = (k / GW) | 0;
+        for (const [di, dj] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+          const ni = ki + di, nj = kj + dj;
+          if (ni < 0 || ni >= GW || nj < 0 || nj >= GH) continue;
+          const nk = Idx(ni, nj, GW);
+          if (!inkD[nk]) dilatedReach[nk] = 1;
+        }
+      }
+      // 用膨胀后的 reach 识别封闭白区
       const regId = new Int32Array(N).fill(-1);
       const regs = [];
       for (let k0 = 0; k0 < N; k0++) {
-        if (inkD[k0] || reach[k0] || regId[k0] >= 0) continue;
+        if (inkD[k0] || dilatedReach[k0] || regId[k0] >= 0) continue;
         const id = regs.length; const cells = [k0]; regId[k0] = id;
         const st2 = [k0];
         while (st2.length) {
           const k = st2.pop(), ki = k % GW, kj = (k / GW) | 0;
-          const tryN = nk => { if (!inkD[nk] && !reach[nk] && regId[nk] < 0) { regId[nk] = id; cells.push(nk); st2.push(nk); } };
+          const tryN = nk => { if (!inkD[nk] && !dilatedReach[nk] && regId[nk] < 0) { regId[nk] = id; cells.push(nk); st2.push(nk); } };
           if (ki > 0) tryN(k - 1);
           if (ki < GW - 1) tryN(k + 1);
           if (kj > 0) tryN(k - GW);

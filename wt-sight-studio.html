@@ -201,6 +201,8 @@ const I18N_TXT = {
   'XDoG 生成': 'XDoG Generate',
   '模型': 'Model',
   'AI 转线稿 · 高级': 'AI Line Drawing · Advanced',
+  '自动（复杂图自动开启增强）': 'Auto (enhance complex art)',
+  '检测到高复杂度图像：自动启用线稿增强': 'Complex image detected: LineRelifer enhancement auto-enabled',
   '二次元线稿 line-drawings': 'Anime line-drawings',
   '二次元线稿 + LineRelifer 增强（更锐利）': 'Anime line-drawings + LineRelifer (sharper)',
   'XDoG 转线稿 · 高级': 'XDoG · Advanced',
@@ -208,10 +210,10 @@ const I18N_TXT = {
   'σ2 模糊半径（1.0~5.0，默认 2.4）': 'σ2 blur radius (1.0~5.0, default 2.4)',
   'φ 锐度增强（10~80，默认 30）': 'φ sharpness (10~80, default 30)',
   'ε 黑白阈值（0~0.3，默认 0.05）': 'ε binarize threshold (0~0.3, default 0.05)',
-  '处理尺寸·长边（0=原图）': 'Process size · long edge (0=original)',
+  '处理尺寸·长边（0=原图，最大 4096）': 'Process size · long edge (0=original, max 4096)',
   '下载线稿 PNG': 'Download line PNG',
   '转换 · 精度': 'Conversion · Precision',
-  '网格宽度（精度，200~1600）': 'Grid width (precision, 200~1600)',
+  '网格宽度（精度，200~2400）': 'Grid width (precision, 200~2400)',
   '简化度 eps（越小越精细）': 'Simplify eps (smaller=finer)',
   '墨线阈值偏移（-60~60）': 'Ink threshold offset (-60~60)',
   '断线桥接（格，0=关）': 'Bridge gap (cells, 0=off)',
@@ -516,7 +518,8 @@ document.addEventListener('click', e => {
         <h3>AI 转线稿 · 高级</h3>
         <div class="f"><label>模型</label>
           <select id="skModel">
-            <option value="line-drawings" selected>二次元线稿 line-drawings</option>
+            <option value="auto" selected>自动（复杂图自动开启增强）</option>
+            <option value="line-drawings">二次元线稿 line-drawings</option>
             <option value="line-drawings_enh">二次元线稿 + LineRelifer 增强（更锐利）</option>
           </select>
         </div>
@@ -1720,7 +1723,13 @@ async function getSketchSession(name) {
 }
 async function aiSketch(apply) {
   const size = num('skSize');
-  const enh = $('skModel').value.indexOf('enh') >= 0;
+  const mode = $('skModel').value;
+  let enh = mode.indexOf('enh') >= 0;
+  if (mode === 'auto' && !enh) {
+    // 复杂度感知：密集发丝/高边缘密度图自动启用 LineRelifer 增强
+    try { enh = !!autoTuneFromImage(img, 0, 0, 1, 1).enh; } catch (e) { }
+    if (enh) setStatus('检测到高复杂度图像：自动启用线稿增强（更锐利）…', 'busy');
+  }
   let W = img.width, H = img.height;
   const maxSide = Math.min(4096, size > 0 ? size : Math.max(W, H));
   // 允许放大（小图在更大画布上推理能出更细线条），上限 4096
@@ -2028,6 +2037,16 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   let cum = 0, p10 = 0, p90 = 0;
   for (let t = 0; t < 256; t++) { cum += hist[t]; if (!p10 && cum >= contentPixels * 0.1) p10 = t; if (!p90 && cum >= contentPixels * 0.9) p90 = t; }
   const contrast = p90 - p10;
+  // --- edge density (complexity metric) ---
+  // 梯度>26 的像素占比：密集发丝/精细插画 → 高；平面 logo/简单图 → 低
+  let edgeCount = 0;
+  for (let j = 1; j < H - 1; j++) for (let i = 1; i < W - 1; i++) {
+    const k = j * W + i;
+    const gx = Math.abs(lum[k + 1] - lum[k - 1]), gy = Math.abs(lum[k + W] - lum[k - W]);
+    if (gx > 26 || gy > 26) edgeCount++;
+  }
+  const edgeRatio = edgeCount / Math.max(1, N);
+  const complex = edgeRatio > 0.25;   // 复杂图：启用精细配置曲线
   // --- gridW auto ---
   // Base = 800, +complexity -> 1000..1400.
   // Complex drivers: small pixels (high ink area / lots of contrast), content not too-dense.
@@ -2037,12 +2056,15 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (srcDiag > 2400) gridW = 1100;
   if (contrast > 90 && inkRatio < 0.45) gridW += 100;  // sharp lines: push detail
   if (inkRatio > 0.6) gridW -= 120;                     // huge solid areas: less detail needed
-  gridW = Math.max(400, Math.min(900, gridW));
+  if (complex) gridW = Math.max(gridW, 1200);           // 复杂图：精度优先
+  if (edgeRatio > 0.40) gridW = Math.max(gridW, 1400);  // 极复杂（密集发丝）：再上一档
+  gridW = Math.max(400, Math.min(complex ? 1400 : 900, gridW));
   // --- dpEps auto: keep constant screen-space precision ---
   // Target = 0.45 grid cells. Larger grid -> bigger eps in cell units.
   // LINE_STEP=1（不跳顶点）需更高 dpEps 补偿段数：DP 简化保角点，跳点切角点，
   // 同段数下 LINE_STEP=1 + 高 dpEps 比 LINE_STEP=2 + 低 dpEps 精度更高（角点不被切）
-  const dpEps = Math.max(0.35, Math.min(2.5, (0.35 + (gridW - 600) / 1400) * 1.9));
+  let dpEps = Math.max(0.35, Math.min(2.5, (0.35 + (gridW - 600) / 1400) * 1.9));
+  if (complex) dpEps *= 0.92;                           // 复杂图：简化再收 8%，保细节
   // --- thrOff ---
   // If darkest is very dark and Otsu will naturally fall low,
   // push thr slightly negative only if content looks overexposed (meanLum high).
@@ -2062,6 +2084,7 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   let minLen = 3;
   if (contrast < 80 && inkRatio < 0.22) minLen = 5;
   if (inkRatio > 0.35) minLen = 2;
+  if (complex) minLen = Math.min(minLen, 2);            // 复杂图：保留短笔画（发丝细节）
   minLen = Math.max(2, Math.min(6, minLen));
   // --- fill strength (1..6) auto ---
   // Dark-heavy images want dense (5-6). Mid-gray gradients want balanced (3-4). Line-art almost no solid, keep light (2).
@@ -2091,12 +2114,14 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (contrast < 70 && inkRatio < 0.22) deburr = 3;
   else if (contrast > 130 && inkRatio > 0.3) deburr = 1;
   if (inkRatio > 0.55) deburr = 1; // big solid ink: minimal clean so we don't nick fill edges.
+  if (complex) deburr = Math.min(deburr, 2);            // 复杂图：修剪轻一点，别咬掉发丝
   deburr = Math.max(0, Math.min(5, deburr));
   // --- deArea auto ---
   // Scale with grid pixels fraction. Small speckle shouldn't survive vectorization as paths.
   let deArea = 6;
   if (contrast < 80 && inkRatio < 0.22) deArea = 10;   // sketchy noisy, kill more specks
   else if (inkRatio > 0.5) deArea = 16;                 // lots of solid ink -> bigger salt grains too
+  if (complex) deArea = Math.min(deArea, 5);            // 复杂图：小特征别误杀
   deArea = Math.max(0, Math.min(400, deArea));
   // --- protectR auto (eye-white halo during fill) ---
   // Always default mild on so users see good result on the first click. Boost when fill is dense.
@@ -2107,7 +2132,8 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   protectR = Math.max(0, Math.min(8, protectR));
   return {
     gridW, dpEps, thrOff, bridge, minLen, fillStrength, fillMin, bgTol, deburr, deArea, protectR,
-    diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag) }
+    enh: complex,
+    diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag), edgeRatio: +edgeRatio.toFixed(3), complex }
   };
 }
 function updateAutoTags(tags) {

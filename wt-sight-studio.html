@@ -2867,6 +2867,8 @@ function convert(o) {
         bgSum += origLum[Idx(i, j, GW)]; bgN++;
       }
       const DARK_THR = Math.max(60, Math.min(140, (bgN ? bgSum / bgN : 255) * 0.42));
+      const DARK_THR_OPEN = Math.max(80, Math.min(170, (bgN ? bgSum / bgN : 255) * 0.58));  // 开放暗区阈值更松
+      // ===== 路径 A：封闭白区检测（精确，处理眼睛/瞳孔等小区域）=====
       // 泛洪：从网格边界走所有白格（非墨）；走不到的白格 = 被墨线封闭的区域
       // 用 8 连接（含对角）让泄漏路径更难绕走，再加 1 次 4 连接膨胀容忍 1px 间隙——
       // AI 线稿眼部轮廓常有 1px 断线，4 连接会让泄漏路径进来把眼睛吞并，8+膨胀后真正封闭的眼睛区域才留下
@@ -2922,13 +2924,51 @@ function convert(o) {
         for (const k of cells) holeMask[k] = 1;
         darkRegions++; darkRegionCells += cells.length;
       }
+      // ===== 路径 B：开放暗区检测（不依赖封闭性，还原头发阴影/衣服褶皱等大面积暗部）=====
+      // 动漫图大部分暗部在 AI 线稿里是开放排线区，路径 A 检测不到。这里直接对 content
+      // （去背景）内、原图亮度 < DARK_THR_OPEN 的格子做连通域，面积在合理范围的标记为暗区。
+      // content 掩码保证不填背景；面积上限防止整个人物被填成大黑块。
+      let openDarkRegions = 0, openDarkCells = 0;
+      const openRegId = new Int32Array(N).fill(-1);
+      const openRegs = [];
+      for (let k0 = 0; k0 < N; k0++) {
+        if (!content[k0] || origLum[k0] >= DARK_THR_OPEN || openRegId[k0] >= 0) continue;
+        if (holeMask[k0]) { openRegId[k0] = -2; continue; }   // 已被路径 A 标记，跳过
+        const id = openRegs.length; const cells = [k0]; openRegId[k0] = id;
+        const st3 = [k0];
+        while (st3.length) {
+          const k = st3.pop(), ki = k % GW, kj = (k / GW) | 0;
+          const tryN = nk => {
+            if (nk < 0 || nk >= N) return;
+            if (!content[nk] || origLum[nk] >= DARK_THR_OPEN || openRegId[nk] >= 0 || holeMask[nk]) return;
+            openRegId[nk] = id; cells.push(nk); st3.push(nk);
+          };
+          if (ki > 0) tryN(k - 1);
+          if (ki < GW - 1) tryN(k + 1);
+          if (kj > 0) tryN(k - GW);
+          if (kj < GH - 1) tryN(k + GW);
+        }
+        openRegs.push(cells);
+      }
+      const OPEN_MIN = Math.max(20, Math.round(N * 0.0002));    // 太小=噪点
+      const OPEN_MAX = Math.round(N * 0.10);                    // 太大=可能是整个人物暗色，不填（原 0.15 导致超体积）
+      for (const cells of openRegs) {
+        if (cells.length < OPEN_MIN || cells.length > OPEN_MAX) continue;
+        // 二次校验：平均亮度要真的够暗（防止 content 内亮区误入）
+        let s = 0; for (const k of cells) s += origLum[k];
+        if (s / cells.length > DARK_THR_OPEN * 0.85) continue;
+        for (const k of cells) holeMask[k] = 1;
+        openDarkRegions++; openDarkCells += cells.length;
+      }
+      darkRegions += openDarkRegions; darkRegionCells += openDarkCells;
       if (darkRegions) {
         fillSrcM = new Uint8Array(inkD);
         fillLumG = Float64Array.from(fillLum);
         for (let k = 0; k < N; k++) if (holeMask[k]) { fillSrcM[k] = 1; fillLumG[k] = origLum[k]; }
         o._darkMask = holeMask;   // quads 剖分来源直并暗区格子（不依赖 rowStep 亮度判定）
       }
-      console.log('[PH]', 'darkRegion', 'thr', Math.round(DARK_THR), 'regions', darkRegions, 'cells', darkRegionCells);
+      console.log('[PH]', 'darkRegion', 'thr', Math.round(DARK_THR), '/ openThr', Math.round(DARK_THR_OPEN),
+        'closed', darkRegions - openDarkRegions, 'open', openDarkRegions, 'cells', darkRegionCells);
     } catch (e) { console.warn('[PH] darkRegion failed', e); }
   }
   applyFill(fillSrcM, fillLumG);
@@ -2937,7 +2977,7 @@ function convert(o) {
   // Pass 0 原始；Pass 1 过滤 ≤2 顶点（1 线段噪点）；Pass 2 过滤 ≤3 顶点（单折角短笔画）；
   // Pass 3+ 才温和放大 eps ×1.18/轮。这样高 gridW 下也尽量靠"丢噪点"而非"砍角点"省字节。
   const fillSegs = segs.splice(detailSegN0);
-  const BLK_OVERHEAD_EST = 3500;
+  const BLK_OVERHEAD_EST = 5200;   // crosshair_distances + 头尾杂项 + quad 块开销（原 3500 偏乐观导致实际超限）
   let budgetPasses = 0, detailCur = smooth, budgetEps = o.dpEps;
   const SHORT_FILTERS = [2, 3];   // 顶点数阈值递增
   let shortIdx = 0;
@@ -2955,7 +2995,7 @@ function convert(o) {
       detailCur = smooth.filter(s => s.length > thr);
       budgetEps = o.dpEps;
     } else {
-      budgetEps = o.dpEps * Math.pow(1.18, budgetPasses - SHORT_FILTERS.length);
+      budgetEps = o.dpEps * Math.pow(1.22, budgetPasses - SHORT_FILTERS.length);
       detailCur = [];
       for (const s of smooth) { const r = dpOpen(s, budgetEps); if (r.length >= 2) detailCur.push(r); }
     }

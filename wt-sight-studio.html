@@ -56,6 +56,22 @@
     animation: studioPulse 3s ease-in-out infinite;
   }
   .studio-entry:hover { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(255,106,0,0.55), 0 0 0 1px rgba(255,255,255,0.25) inset !important; }
+  .oneclick {
+    background: linear-gradient(135deg, #a855f7, #ec4899) !important;
+    color: #fff !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    padding: 14px 18px !important;
+    border-radius: 12px !important;
+    width: 100%;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 14px rgba(168,85,247,0.45), 0 0 0 1px rgba(255,255,255,0.2) inset !important;
+    transition: transform 0.12s, box-shadow 0.12s !important;
+    animation: oneclickPulse 2.6s ease-in-out infinite;
+  }
+  .oneclick:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(236,72,153,0.55), 0 0 0 1px rgba(255,255,255,0.3) inset !important; }
+  .oneclick:disabled { opacity: 0.5; animation: none; }
+  @keyframes oneclickPulse { 0%,100% { box-shadow: 0 2px 14px rgba(168,85,247,0.45), 0 0 0 1px rgba(255,255,255,0.2) inset; } 50% { box-shadow: 0 2px 18px rgba(236,72,153,0.6), 0 0 0 1px rgba(255,255,255,0.25) inset; } }
   @keyframes studioPulse { 0%,100% { box-shadow: 0 2px 12px rgba(255,106,0,0.4), 0 0 0 1px rgba(255,255,255,0.15) inset; } 50% { box-shadow: 0 2px 16px rgba(255,140,0,0.65), 0 0 0 1px rgba(255,255,255,0.25) inset; } }
   .row { display: flex; gap: 8px; margin-top: 10px; }
   .row > button { flex: 1; }
@@ -499,6 +515,7 @@ document.addEventListener('click', e => {
 
     <div class="panel panel-sticky">
       <h2>② 生成 & 下载</h2>
+      <button id="goOneClick" class="oneclick" disabled>✨ 一键出</button>
       <button id="go" disabled>生成瞄具 .blk</button>
       <button id="goManual" class="ghost" disabled>用当前设置生成 .blk</button>
       <button id="studioBtn" class="studio-entry" title="进入独立绘画工作台（中心准心+放大+像素橡皮+手绘描边）">✏️ 绘画工作台</button>
@@ -779,11 +796,11 @@ function loadFile(f) {
   const im = new Image();
   im.onload = () => {
     img = im; srcOriginal = im; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
-    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
+    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; $('goOneClick').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
-    setStatus('已加载，点「AI 转线稿」预处理，或直接点「生成瞄具 .blk」', 'ok');
+    setStatus('已加载，点「✨ 一键出」自动出瞄具，或点「AI 转线稿」预处理后手动生成', 'ok');
   };
   im.onerror = () => setStatus('图片加载失败', 'err');
   im.src = url;
@@ -794,8 +811,8 @@ function loadDefaultSourceImage() {
   const im = new Image();
   im.onload = () => {
     if (img) return; // 用户已手动上传则不覆盖
-    img = im; srcOriginal = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「AI 转线稿」或上传你自己的图片';
-    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
+    img = im; srcOriginal = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「✨ 一键出」或上传你自己的图片';
+    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; $('goOneClick').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
@@ -2346,13 +2363,14 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (inkRatio > 0.6) gridW -= 120;                     // huge solid areas: less detail needed
   if (complex) gridW = Math.max(gridW, 1200);           // 复杂图：精度优先
   if (edgeRatio > 0.20) gridW = Math.max(gridW, 1400);  // 极复杂（密集发丝）：再上一档（实测动漫图很难超过 0.25，原 0.40 永远触发不了）
-  gridW = Math.max(400, Math.min(complex ? 1400 : 900, gridW));
+  gridW = Math.max(400, Math.min(complex ? 2000 : 1100, gridW));
   // --- dpEps auto: keep constant screen-space precision ---
   // Target = 0.45 grid cells. Larger grid -> bigger eps in cell units.
   // LINE_STEP=1（不跳顶点）需更高 dpEps 补偿段数：DP 简化保角点，跳点切角点，
   // 同段数下 LINE_STEP=1 + 高 dpEps 比 LINE_STEP=2 + 低 dpEps 精度更高（角点不被切）
   let dpEps = Math.max(0.35, Math.min(2.5, (0.35 + (gridW - 600) / 1400) * 1.9));
-  if (complex) dpEps *= 0.92;                           // 复杂图：简化再收 8%，保细节
+  if (complex) dpEps *= 0.70;                           // 复杂图：简化收 30%，保曲线角点（动漫发丝/眼睛轮廓需要）
+  else if (inkRatio < 0.20 && contrast > 60) dpEps *= 0.82;  // 动漫特征（细线+高对比+低墨量）：也收 18%，比复杂图稍松但比照片紧
   // --- thrOff ---
   // If darkest is very dark and Otsu will naturally fall low,
   // push thr slightly negative only if content looks overexposed (meanLum high).
@@ -2418,10 +2436,13 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (inkRatio < 0.12 && fillStrength <= 2) protectR = 1;// pure light line drawing: less fill -> smaller halo
   if (inkRatio > 0.5) protectR = 3;                      // heavy solid, more chance to smother small holes
   protectR = Math.max(0, Math.min(8, protectR));
+  // line-relifer 增强模型：动漫图（细线+高对比+低墨量）默认开，不只是 complex。
+  // 动漫线稿的锐利度本身就是质量核心，不管复杂度都需要。
+  const animeLike = inkRatio < 0.20 && contrast > 60;
   return {
     gridW, dpEps, thrOff, bridge, minLen, fillStrength, fillMin, bgTol, deburr, deArea, protectR,
-    enh: complex,
-    diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag), edgeRatio: +edgeRatio.toFixed(3), complex }
+    enh: complex || animeLike,
+    diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag), edgeRatio: +edgeRatio.toFixed(3), complex, animeLike }
   };
 }
 function updateAutoTags(tags) {
@@ -2451,7 +2472,7 @@ function convert(o) {
   //   防止 bilinear 引入灰阶伪细节 → 泛洪误判 → 填充段爆炸（历史教训：3色块→40320段 2.7MB）
   // · 大图：高质量平滑缩小到 ≤ gridW ≤ 1600
   // GW 真正的硬上限 = workW（L1413 会 clamp min(gridW, cw)=workW）。
-  const targetW = Math.min(o.gridW, 1600);
+  const targetW = Math.min(o.gridW, 2000);
   const workW = Math.max(cw0, targetW);   // 允许放大；不允许小于源图
   const sc = workW / cw0;
   const cw = workW, chh = Math.max(1, Math.round(ch0 * sc));
@@ -2793,7 +2814,7 @@ function convert(o) {
   const smooth = [];
   for (const path of paths) {
     const pts = path.map(k => [k % GW, (k / GW) | 0]);
-    const s = dpOpen(chaikinOpen(pts, 1), o.dpEps);
+    const s = dpOpen(chaikinOpen(pts, 2), o.dpEps);
     if (s.length >= 2) smooth.push(s);
   }
   const weldedN = weldChains(smooth, 2.5);
@@ -2901,14 +2922,13 @@ function convert(o) {
   }
   applyFill(fillSrcM, fillLumG);
   window.__ph.push(['applyFill', Math.round(performance.now() - t0)]); console.log('[PH]', 'applyFill', window.__ph[window.__ph.length - 1][1], 'quads', JSON.stringify(o._quadInfo));
-  // ===== 全局体积预算：细节线按剩余字节自适应重简化，杜绝裁尾丢下半身 =====
-  // 动漫图细节线动辄上万段（≈67B/段），直接塞满 853KB 上限后 trimBlkToSize 会砍掉尾部
-  // （实测 reisen 图裁掉 149.9KB，下半身直接消失）。填充段/quads 此时已定稿，
-  // 唯一可无损压缩的是细节线：对已提取的中心线放大 eps 重简化（不重跑 zhangSuen/分割等重阶段），
-  // 单轮毫秒级，最多 4 轮。4 轮后仍超限才走原有裁尾兜底。
-  const fillSegs = segs.splice(detailSegN0);   // 摘出填充段，segs 只剩细节段
-  const BLK_OVERHEAD_EST = 3500;               // crosshair_distances + 头尾杂项的保守估计
+  // ===== 全局体积预算：先筛极短笔画，再按需温和放大 eps，杜绝粗暴砍细节 =====
+  // 第 0 轮原始参数；第 1 轮过滤极短路径（≤2 顶点）；第 2+ 轮再温和放大 eps
+  // （避免一刀切从 eps 1.36→1.97 损失曲线角点的粗暴做法）。
+  const fillSegs = segs.splice(detailSegN0);
+  const BLK_OVERHEAD_EST = 3500;
   let budgetPasses = 0, detailCur = smooth, budgetEps = o.dpEps;
+  let budgetFilterShort = false;
   for (;;) {
     segs.length = 0;
     for (const s of detailCur) emitPolyline(s, false, false);
@@ -2917,11 +2937,19 @@ function convert(o) {
     for (const s of segs) bytes += s[1].length;
     if (bytes <= BLK_SIZE_LIMIT || budgetPasses >= 4 || !detailCur.length) break;
     budgetPasses++;
-    budgetEps = o.dpEps * Math.pow(1.45, budgetPasses);
-    detailCur = [];
-    for (const s of smooth) { const r = dpOpen(s, budgetEps); if (r.length >= 2) detailCur.push(r); }
+    // Pass 1: 过滤极短路径（≤2 顶点的短笔画是噪点，丢了不伤筋）
+    if (budgetPasses === 1) {
+      budgetFilterShort = true;
+      detailCur = smooth.filter(s => s.length > 2);
+      budgetEps = o.dpEps;
+    } else {
+      // Pass 2-4: 温和放大 eps（每轮 ×1.25，比原来 ×1.45 保守得多）
+      budgetEps = o.dpEps * Math.pow(1.25, budgetPasses - 1);
+      detailCur = [];
+      for (const s of smooth) { const r = dpOpen(s, budgetEps); if (r.length >= 2) detailCur.push(r); }
+    }
   }
-  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2));
+  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2), budgetFilterShort ? '(filter-short)' : '');
   flushSegs();
   window.__ph.push(['flush', Math.round(performance.now() - t0)]); console.log('[PH]', 'flush', window.__ph[window.__ph.length - 1][1], 'segs', segCount);
   const quadInfo = o._quadInfo || { quads: 0, bytes: 0, blobs: 0, fail: 0, skip: 0, active: false };
@@ -3440,8 +3468,8 @@ function initManualEdit() {
       if (d.points.length >= 2) {
         const pts = d.points.map(p => [p.x, p.y]);
         const simplified = dpOpen(pts, 0.003);
-        // Chaikin 1 轮平滑（保锐角又去抖）
-        const smoothed = chaikinOpen(simplified, 1);
+        // Chaikin 2 轮平滑（更顺滑曲线）
+        const smoothed = chaikinOpen(simplified, 2);
         for (let i = 0; i < smoothed.length - 1; i++) {
           manualState.lines.push({ x1: smoothed[i][0], y1: smoothed[i][1], x2: smoothed[i+1][0], y2: smoothed[i+1][1] });
         }
@@ -4427,6 +4455,21 @@ function doGenerate({ retuneAuto, buttonLabel }) {
 }
 
 go.onclick = () => doGenerate({ retuneAuto: true,  buttonLabel: '正在重新自动判断参数并生成瞄具' });
+// 一键出：AI 转线稿 + 生成瞄具串成一个动作，用户加载图后点一次就行
+const oc = $('goOneClick');
+if (oc) oc.onclick = async () => {
+  if (!img) { setStatus('请先上传图片', 'err'); return; }
+  oc.disabled = true; go.disabled = true; $('skRun').disabled = true;
+  setStatus('✨ 一键出：AI 转线稿中…', 'busy');
+  try {
+    await aiSketch(true);
+    setStatus('✨ 一键出：自动调参 + 生成瞄具中…', 'busy');
+    await doGenerate({ retuneAuto: true, buttonLabel: '✨ 一键出：自动调参并生成' });
+  } catch (e) {
+    setStatus('一键出失败：' + (e.message || e), 'err');
+  }
+  oc.disabled = false; go.disabled = !img; $('skRun').disabled = !img;
+};
 const gm = $('goManual');
 if (gm) gm.onclick = () => doGenerate({ retuneAuto: false, buttonLabel: '正在按当前设置生成瞄具' });
 
@@ -4613,7 +4656,7 @@ if ($('dlManual')) $('dlManual').onclick = () => {
 // ============ debug hooks (preserved) ============
 window.__load = url => new Promise(res => {
   const im = new Image();
-  im.onload = () => { img = im; srcOriginal = im; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
+  im.onload = () => { img = im; srcOriginal = im; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('goOneClick').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
   im.src = url;
 });
 window.__run = ov => {

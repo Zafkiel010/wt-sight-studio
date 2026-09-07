@@ -607,6 +607,7 @@ const drop = $('drop'), file = $('file'), go = $('go'), dl = $('dl');
 const statusEl = $('status'), pv = $('pv'), pvWrap = $('pvWrap'), pvTag = $('pvTag');
 let img = null, lastBlk = '', lastOpts = null;   // lastOpts 供预览画布重绘用
 let srcOriginal = null;   // AI/XDoG 应用前的原始彩图；动漫暗区还原（封闭暗色区域→实心填充）需要原图明暗信息
+let isSketchApplied = false;   // 当前 img 是否已经经过 AI/XDoG 转线稿（决定 go 按钮是否需要先转线稿）
 // War Thunder .blk 坐标基准：屏幕宽度 = 1。屏幕高度因此 = 9/16 ≈ 0.5625。
 // 预览层 y0 / H 比例是相对屏幕高度归一化 (0..1)，写入 blk 时统一乘以本系数转换。
 const Y_BLK_SCALE = 9 / 16;
@@ -795,7 +796,7 @@ function loadFile(f) {
   const url = URL.createObjectURL(f);
   const im = new Image();
   im.onload = () => {
-    img = im; srcOriginal = im; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
+    img = im; srcOriginal = im; isSketchApplied = false; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
     go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; $('goOneClick').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
@@ -813,7 +814,7 @@ function loadDefaultSourceImage() {
   const im = new Image();
   im.onload = () => {
     if (img) return; // 用户已手动上传则不覆盖
-    img = im; srcOriginal = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「✨ 一键出」或上传你自己的图片';
+    img = im; srcOriginal = im; isSketchApplied = false; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「✨ 一键出」或上传你自己的图片';
     go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; $('goOneClick').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
@@ -2131,6 +2132,7 @@ async function aiSketch(apply) {
       const im = new Image();
       im.onload = () => {
         img = im;
+        isSketchApplied = true;   // 标记已转线稿
         $('srcName').textContent = 'AI 线稿（' + im.width + '×' + im.height + '，原图已替换）';
         go.disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
         $('sightWrap').style.display = 'block';
@@ -2252,6 +2254,7 @@ async function xdogSketch(apply) {
       const im = new Image();
       im.onload = () => {
         img = im;
+        isSketchApplied = true;   // 标记已转线稿
         $('srcName').textContent = 'XDoG 线稿（' + im.width + '×' + im.height + '，原图已替换）';
         go.disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
         $('sightWrap').style.display = 'block';
@@ -2757,7 +2760,7 @@ function convert(o) {
     const pcts = [];
     for (let k = 0; k < N; k++) if (content[k]) pcts.push(minLum[k]);
     pcts.sort((a, b) => a - b);
-    const pct10 = pcts.length ? pcts[Math.min(pcts.length - 1, Math.round(pcts.length * 0.10))] : 120;
+    const pct10 = pcts.length ? pcts[Math.min(pcts.length - 1, Math.round(pcts.length * 0.18))] : 120;
     T = Math.max(30, Math.min(220, pct10 + o.thrOff));
   } else {
     T = Math.max(30, Math.min(220, otsu(minLum, content, N) + o.thrOff));
@@ -2794,7 +2797,7 @@ function convert(o) {
           const gy = -g00 - 2 * g10 - g20 + g02 + 2 * g12 + g22;
           const mag = Math.sqrt(gx * gx + gy * gy);
           const k = j * GW + i;
-          if (content[k] && mag > 28) edge[k] = 1;   // 阈值 28：够细的边缘才进
+          if (content[k] && mag > 42) edge[k] = 1;   // 阈值 42：只让清晰边缘进，避免大片灰阶变墨
         }
       }
       // 细线膨胀 1 格（Sobel 边缘可能只有 1px 宽，dilation 让它和 AI 线稿同宽）
@@ -2966,7 +2969,7 @@ function convert(o) {
         bgSum += origLum[Idx(i, j, GW)]; bgN++;
       }
       const DARK_THR = Math.max(60, Math.min(140, (bgN ? bgSum / bgN : 255) * 0.42));
-      const DARK_THR_OPEN = Math.max(80, Math.min(170, (bgN ? bgSum / bgN : 255) * 0.58));  // 开放暗区阈值更松
+      const DARK_THR_OPEN = Math.max(90, Math.min(160, (bgN ? bgSum / bgN : 255) * 0.50));  // 开放暗区阈值更严（原 0.58 太松，头发全填黑）
       // ===== 路径 A：封闭白区检测（精确，处理眼睛/瞳孔等小区域）=====
       // 泛洪：从网格边界走所有白格（非墨）；走不到的白格 = 被墨线封闭的区域
       // 用 8 连接（含对角）让泄漏路径更难绕走，再加 1 次 4 连接膨胀容忍 1px 间隙——
@@ -3050,7 +3053,7 @@ function convert(o) {
         openRegs.push(cells);
       }
       const OPEN_MIN = Math.max(20, Math.round(N * 0.0002));    // 太小=噪点
-      const OPEN_MAX = Math.round(N * 0.10);                    // 太大=可能是整个人物暗色，不填（原 0.15 导致超体积）
+      const OPEN_MAX = Math.round(N * 0.06);                    // 太大=头发主体，不填（原 0.10 太松）
       for (const cells of openRegs) {
         if (cells.length < OPEN_MIN || cells.length > OPEN_MAX) continue;
         // 二次校验：平均亮度要真的够暗（防止 content 内亮区误入）
@@ -4606,7 +4609,22 @@ function doGenerate({ retuneAuto, buttonLabel }) {
   }, 30);
 }
 
-go.onclick = () => doGenerate({ retuneAuto: true,  buttonLabel: '正在重新自动判断参数并生成瞄具' });
+// 生成瞄具 .blk：如果当前 img 还没转线稿，自动先跑 AI 转线稿再生成；已转线稿则直接生成
+go.onclick = async () => {
+  if (!img) { setStatus('请先上传图片', 'err'); return; }
+  if (!isSketchApplied) {
+    // 自动先转线稿（按智能方案选模型）
+    setStatus('自动转线稿中…', 'busy');
+    try {
+      await aiSketch(true);
+    } catch (e) {
+      setStatus('自动转线稿失败：' + (e.message || e), 'err');
+      return;
+    }
+    if (!isSketchApplied) return;   // aiSketch 失败时 isSketchApplied 不会变 true
+  }
+  doGenerate({ retuneAuto: true, buttonLabel: '正在重新自动判断参数并生成瞄具' });
+};
 // 一键出：AI 转线稿 + 生成瞄具串成一个动作，用户加载图后点一次就行
 const oc = $('goOneClick');
 if (oc) oc.onclick = async () => {
@@ -4808,7 +4826,7 @@ if ($('dlManual')) $('dlManual').onclick = () => {
 // ============ debug hooks (preserved) ============
 window.__load = url => new Promise(res => {
   const im = new Image();
-  im.onload = () => { img = im; srcOriginal = im; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('goOneClick').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
+  im.onload = () => { img = im; srcOriginal = im; isSketchApplied = false; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('goOneClick').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
   im.src = url;
 });
 window.__run = ov => {

@@ -800,7 +800,9 @@ function loadFile(f) {
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
-    setStatus('已加载，点「✨ 一键出」自动出瞄具，或点「AI 转线稿」预处理后手动生成', 'ok');
+    let planHint = '';
+    try { const p = autoTuneFromImage(im, 0, 0, 1, 1).plan; if (p) planHint = '（' + p.reason + '）'; } catch (e) {}
+    setStatus('已加载' + planHint + '，点「✨ 一键出」自动出瞄具', 'ok');
   };
   im.onerror = () => setStatus('图片加载失败', 'err');
   im.src = url;
@@ -2027,11 +2029,23 @@ async function getSketchSession(name) {
 async function aiSketch(apply) {
   const size = num('skSize');
   const mode = $('skModel').value;
+  // 智能方案选择：auto 模式下根据图像特征自动选最优模型
+  let plan = null;
+  try { plan = autoTuneFromImage(img, 0, 0, 1, 1).plan; } catch (e) {}
   let enh = mode.indexOf('enh') >= 0;
-  if (mode === 'auto' && !enh) {
-    // 复杂度感知：密集发丝/高边缘密度图自动启用 LineRelifer 增强
-    try { enh = !!autoTuneFromImage(img, 0, 0, 1, 1).enh; } catch (e) { }
-    if (enh) setStatus('检测到高复杂度图像：自动启用线稿增强（更锐利）…', 'busy');
+  let useXdog = false;
+  if (mode === 'auto') {
+    if (plan && plan.model === 'xdog') {
+      useXdog = true;
+      setStatus('智能方案：' + plan.reason, 'busy');
+    } else {
+      enh = plan ? (plan.model === 'line-drawings_enh') : (mode.indexOf('enh') >= 0);
+      if (plan) setStatus('智能方案：' + plan.reason, 'busy');
+    }
+  }
+  if (useXdog) {
+    // 简单图形/Logo 用 XDoG（xdogSketch 内部读 UI 参数）
+    return xdogSketch(apply);
   }
   let W = img.width, H = img.height;
   // 动漫图精细模式：AI 推理分辨率至少 1536（哪怕原图更小也放大推理，模型能出更细的线）。
@@ -2450,9 +2464,31 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   protectR = Math.max(0, Math.min(8, protectR));
   // line-relifer 增强模型：动漫图（细线+高对比+低墨量）默认开，不只是 complex。
   // 动漫线稿的锐利度本身就是质量核心，不管复杂度都需要。
+  // ===== 智能方案选择：根据图像特征自动选最优模型+填充+暗区还原组合 =====
+  // 分类规则（按优先级）：
+  //   1. 简单图形/Logo：edgeRatio<0.08 且 contentRatio<0.3 → XDoG + scan（AI 模型会过度处理几何图形）
+  //   2. 动漫彩图：inkRatio 0.12~0.4 且 contrast>80 → AI+增强 + quads + 暗区还原
+  //   3. 动漫线稿：inkRatio<0.12 且 contrast>100 且 meanLum>200 → AI+增强 + quads + 暗区还原
+  //   4. 写实照片：inkRatio>0.4 或 contrast<60 → AI(不增强) + scan（照片不需要锐利增强，排线保层次）
+  //   5. 其他/不确定：AI+增强 + quads（动漫是主打场景，默认向动漫倾斜）
+  let planModel, planFill, planDark, planReason;
+  if (edgeRatio < 0.08 && contentRatio < 0.30) {
+    planModel = 'xdog'; planFill = 'scan'; planDark = false;
+    planReason = '简单图形/Logo → XDoG + 扫描线（AI 模型会过度处理几何线条）';
+  } else if (inkRatio > 0.40 || contrast < 55) {
+    planModel = 'line-drawings'; planFill = 'scan'; planDark = false;
+    planReason = '写实照片/低对比 → AI 基础模型 + 扫描线排线（保明暗层次）';
+  } else if (animeLike || (inkRatio < 0.40 && contrast > 80)) {
+    planModel = 'line-drawings_enh'; planFill = 'quads'; planDark = true;
+    planReason = '动漫图 → AI 增强模型 + drawQuads 实心 + 暗区还原';
+  } else {
+    planModel = 'line-drawings_enh'; planFill = 'quads'; planDark = true;
+    planReason = '默认动漫方案 → AI 增强 + drawQuads + 暗区还原';
+  }
   return {
     gridW, dpEps, thrOff, bridge, minLen, fillStrength, fillMin, bgTol, deburr, deArea, protectR,
     enh: complex || animeLike,
+    plan: { model: planModel, fillMode: planFill, darkRestore: planDark, reason: planReason },
     diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag), edgeRatio: +edgeRatio.toFixed(3), complex, animeLike }
   };
 }
@@ -2846,7 +2882,7 @@ function convert(o) {
   // → rowStep=1 → 走 drawQuads 实心或满行扫描线，动漫的"黑发黑瞳"才立得起来。
   // 封闭性泄漏只会导致漏检（区域连通到背景），不会误检，安全。
   let darkRegions = 0, darkRegionCells = 0, fillSrcM = inkD, fillLumG = fillLum;
-  if (o.srcOriginal && o.fillOn && o.fillStrength >= 1) {
+  if (o.srcOriginal && o.fillOn && o.fillStrength >= 1 && o.planDarkRestore !== false) {
     try {
       const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
       const og2 = oc.getContext('2d', { willReadFrequently: true });
@@ -4380,10 +4416,10 @@ function resolveOptions(img, auto) {
   const v_deArea = v_deAreaUI === 0 ? auto.deArea : v_deAreaUI;
   const v_protectRUI = Math.max(0, Math.min(8, Math.round(num('protectR') || 0)));
   const v_protectR = v_protectRUI === 0 ? auto.protectR : v_protectRUI;
-  // 填充方式：auto = 复杂图（边缘密度阈值判定）用 drawQuads 实心填充，简单图走传统扫描线
+  // 填充方式：auto = 智能方案选择（简单图形→scan，动漫→quads，照片→scan）
   const v_fillModeUI = $('fillMode') ? $('fillMode').value : 'auto';
   const v_fillMode = v_fillModeUI === 'auto'
-    ? ((auto.diagnostics && auto.diagnostics.complex) ? 'quads' : 'scan')
+    ? ((auto.plan && auto.plan.fillMode) || ((auto.diagnostics && auto.diagnostics.complex) ? 'quads' : 'scan'))
     : v_fillModeUI;
   const o = {
     cL, cT, cR, cB,
@@ -4396,6 +4432,7 @@ function resolveOptions(img, auto) {
     fillStrength: v_fillStrengthEff, fillMin: v_fillMin, protectR: v_protectR,
     bgTol: v_bgTol,
     srcOriginal: srcOriginal || null,   // 动漫暗区还原用；无则跳过该特性
+    planDarkRestore: auto.plan ? auto.plan.darkRestore : true,  // 智能方案决定是否启用暗区还原
     bgV1: $('bgV1').checked, bgAggr: $('bgAggr').checked,
     x0: sight.x0, y0: sight.y0, w: sight.w,
     cross: $('cross').checked,
@@ -4436,8 +4473,9 @@ function buildStatusFromRun(r, autoTuneUsed) {
      ' 护眼' + v_protectR + '(' + prMark + ')' +
      (deb ? (' 墨格 ' + deb.inkBefore + '→' + deb.inkAfter) : '')) : '';
   const tuneTxt = autoTuneUsed ? '（重新自动判断）' : '（沿用上次自动）';
+  const planTxt = (auto.plan && autoTuneUsed) ? (' · 方案：' + auto.plan.reason) : '';
   return (
-    '生成完成' + tuneTxt + '：参数：网格 ' + v_gridW + '(' + man(v_gridW, auto.gridW) + ')' +
+    '生成完成' + tuneTxt + planTxt + '：参数：网格 ' + v_gridW + '(' + man(v_gridW, auto.gridW) + ')' +
     ' eps ' + (+v_dpEps).toFixed(2) + '(' + man(v_dpEps, auto.dpEps) + ')' +
     ' 阈值偏移 ' + v_thrOff + '(' + man(v_thrOff, auto.thrOff) + ')' +
     ' 桥接 ' + v_bridge + '(' + man(v_bridge, auto.bridge) + ')' +

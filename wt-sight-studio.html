@@ -2749,13 +2749,76 @@ function convert(o) {
   };
 
   // ---- centerline mode (only mode now) ----
-  const T = Math.max(30, Math.min(220, otsu(minLum, content, N) + o.thrOff));
+  // 阈值策略：复杂图用百分位阈值替代 Otsu——Otsu 对细线多的动漫图阈值偏高（双峰假设不成立），
+  // 用 content 区域内 minLum 的 P% 分位能稳定捕捉极细发丝。
+  let T;
+  if (o.complex) {
+    // 复杂图：取 content 区域内 minLum 的 10% 分位 + thrOff 偏移
+    const pcts = [];
+    for (let k = 0; k < N; k++) if (content[k]) pcts.push(minLum[k]);
+    pcts.sort((a, b) => a - b);
+    const pct10 = pcts.length ? pcts[Math.min(pcts.length - 1, Math.round(pcts.length * 0.10))] : 120;
+    T = Math.max(30, Math.min(220, pct10 + o.thrOff));
+  } else {
+    T = Math.max(30, Math.min(220, otsu(minLum, content, N) + o.thrOff));
+  }
   const inkRaw = new Uint8Array(N);
   for (let k = 0; k < N; k++) inkRaw[k] = (content[k] && minLum[k] < T) ? 1 : 0;
-  // Deburr: remove speckle + prune endpoint hair BEFORE bridge-dilate so we don't inflate jaggies.
+  // ===== 原图边缘补充通道：捕捉 AI 线稿漏掉的极细发丝 =====
+  // AI 模型对 1-2px 发丝识别有限，但原图上这些发丝是真实存在的边缘。
+  // 对 srcOriginal 做 Sobel，content 区域内边缘强度够高的格子 OR 进 inkRaw。
+  if (o.srcOriginal && o.complex) {
+    try {
+      const ec = document.createElement('canvas'); ec.width = GW; ec.height = GH;
+      const eg = ec.getContext('2d', { willReadFrequently: true });
+      eg.imageSmoothingEnabled = true; eg.imageSmoothingQuality = 'high';
+      eg.drawImage(o.srcOriginal,
+        o.cL * o.srcOriginal.width, o.cT * o.srcOriginal.height,
+        Math.max(1, Math.round(o.srcOriginal.width * (o.cR - o.cL))),
+        Math.max(1, Math.round(o.srcOriginal.height * (o.cB - o.cT))),
+        0, 0, GW, GH);
+      const eData = eg.getImageData(0, 0, GW, GH).data;
+      const edge = new Uint8Array(N);
+      // Sobel 梯度
+      for (let j = 1; j < GH - 1; j++) {
+        for (let i = 1; i < GW - 1; i++) {
+          const idx = (j * GW + i) * 4;
+          // 3×3 Sobel（用灰度）
+          const g00 = eData[((j - 1) * GW + i - 1) * 4];
+          const g02 = eData[((j - 1) * GW + i + 1) * 4];
+          const g10 = eData[(j * GW + i - 1) * 4];
+          const g12 = eData[(j * GW + i + 1) * 4];
+          const g20 = eData[((j + 1) * GW + i - 1) * 4];
+          const g22 = eData[((j + 1) * GW + i + 1) * 4];
+          const gx = -g00 + g02 - 2 * g10 + 2 * g12 - g20 + g22;
+          const gy = -g00 - 2 * g10 - g20 + g02 + 2 * g12 + g22;
+          const mag = Math.sqrt(gx * gx + gy * gy);
+          const k = j * GW + i;
+          if (content[k] && mag > 28) edge[k] = 1;   // 阈值 28：够细的边缘才进
+        }
+      }
+      // 细线膨胀 1 格（Sobel 边缘可能只有 1px 宽，dilation 让它和 AI 线稿同宽）
+      const edgeD = new Uint8Array(N);
+      for (let j = 0; j < GH; j++) {
+        for (let i = 0; i < GW; i++) {
+          if (!edge[j * GW + i]) continue;
+          for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+            const ni = i + di, nj = j + dj;
+            if (ni >= 0 && ni < GW && nj >= 0 && nj < GH) edgeD[nj * GW + ni] = 1;
+          }
+        }
+      }
+      let added = 0;
+      for (let k = 0; k < N; k++) if (edgeD[k] && !inkRaw[k]) { inkRaw[k] = 1; added++; }
+      console.log('[PH]', 'edgeSupplement', 'added', added, 'cells from', o.srcOriginal.width + 'x' + o.srcOriginal.height);
+    } catch (e) { console.warn('[PH] edgeSupplement failed', e); }
+  }
+  // Deburr：复杂图减到 0-1 轮，别把发丝当噪点删了
   const dBurrPasses = Math.max(0, Math.min(5, Math.round(o.deburr || 0)));
   const dArea = Math.max(0, Math.min(1000, Math.round(o.deArea || 0)));
-  const ink = (dBurrPasses > 0 || dArea > 0) ? deburrMask(inkRaw, GW, GH, dBurrPasses, dArea) : inkRaw;
+  const dBurrEff = o.complex ? Math.min(dBurrPasses, 1) : dBurrPasses;
+  const dAreaEff = o.complex ? Math.min(dArea, 30) : dArea;
+  const ink = (dBurrEff > 0 || dAreaEff > 0) ? deburrMask(inkRaw, GW, GH, dBurrEff, dAreaEff) : inkRaw;
   const br = Math.max(0, Math.min(3, Math.round(o.bridge)));
   const inkD = br > 0 ? dilate8(ink, GW, GH, br) : ink;
   o._deburrStats = { passes: dBurrPasses, minArea: dArea, inkBefore: inkSum(inkRaw), inkAfter: inkSum(ink) };

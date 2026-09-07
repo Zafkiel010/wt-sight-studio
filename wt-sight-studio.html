@@ -2034,7 +2034,17 @@ async function aiSketch(apply) {
     if (enh) setStatus('检测到高复杂度图像：自动启用线稿增强（更锐利）…', 'busy');
   }
   let W = img.width, H = img.height;
-  const maxSide = Math.min(4096, size > 0 ? size : Math.max(W, H));
+  // 动漫图精细模式：AI 推理分辨率至少 1536（哪怕原图更小也放大推理，模型能出更细的线）。
+  // 实测 800px 原图在 1536px 下推理，发丝/睫毛细节明显更多。
+  let wantSize = size > 0 ? size : Math.max(W, H);
+  try {
+    const diag = autoTuneFromImage(img, 0, 0, 1, 1).diagnostics;
+    if (diag && (diag.complex || (diag.inkRatio < 0.20 && diag.contrast > 60))) {
+      wantSize = Math.max(wantSize, 1536);
+      if (diag.edgeRatio > 0.20) wantSize = Math.max(wantSize, 2048);
+    }
+  } catch (e) {}
+  const maxSide = Math.min(4096, wantSize);
   // 允许放大（小图在更大画布上推理能出更细线条），上限 4096
   const k = maxSide / Math.max(W, H);
   W = Math.max(8, Math.round(W * k / 8) * 8); H = Math.max(8, Math.round(H * k / 8) * 8);
@@ -2091,7 +2101,7 @@ async function aiSketch(apply) {
     bg.drawImage(c, 0, 0);
     const blurred = bg.getImageData(0, 0, OW, OH);
     const orig = g.getImageData(0, 0, OW, OH);
-    const amt = 0.8;  // 锐化强度 0.5~1.5 之间，默认 0.8 比较安全
+    const amt = enh ? 1.4 : 1.1;  // 增强模式下更锐利；动漫图默认 1.1（原 0.8）
     const o = orig.data, b = blurred.data;
     for (let i = 0; i < o.length; i += 4) {
       const diff = (o[i] - b[i]) * amt;
@@ -2352,6 +2362,7 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   // 阈值按实测校准（640px 分析宽）：默认瞄具 0.105 / 一般动漫图 0.108 / 精细复杂插画 0.147
   // 动漫线稿是细线+大色块，edgeRatio 天然远低于照片，0.25 会漏判所有二次元图
   const complex = edgeRatio > 0.13;   // 复杂图：启用精细配置曲线
+  const animeLike = inkRatio < 0.20 && contrast > 60;  // 动漫特征：细线+高对比+低墨量
   // --- gridW auto ---
   // Base = 800, +complexity -> 1000..1400.
   // Complex drivers: small pixels (high ink area / lots of contrast), content not too-dense.
@@ -2361,43 +2372,42 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (srcDiag > 2400) gridW = 1100;
   if (contrast > 90 && inkRatio < 0.45) gridW += 100;  // sharp lines: push detail
   if (inkRatio > 0.6) gridW -= 120;                     // huge solid areas: less detail needed
-  if (complex) gridW = Math.max(gridW, 1200);           // 复杂图：精度优先
-  if (edgeRatio > 0.20) gridW = Math.max(gridW, 1400);  // 极复杂（密集发丝）：再上一档（实测动漫图很难超过 0.25，原 0.40 永远触发不了）
+  if (complex) gridW = Math.max(gridW, 1600);           // 复杂图：精度优先，直接 1600 起步
+  if (edgeRatio > 0.20) gridW = Math.max(gridW, 2000);  // 极复杂（密集发丝）：拉满 2000
   gridW = Math.max(400, Math.min(complex ? 2000 : 1100, gridW));
   // --- dpEps auto: keep constant screen-space precision ---
   // Target = 0.45 grid cells. Larger grid -> bigger eps in cell units.
   // LINE_STEP=1（不跳顶点）需更高 dpEps 补偿段数：DP 简化保角点，跳点切角点，
   // 同段数下 LINE_STEP=1 + 高 dpEps 比 LINE_STEP=2 + 低 dpEps 精度更高（角点不被切）
   let dpEps = Math.max(0.35, Math.min(2.5, (0.35 + (gridW - 600) / 1400) * 1.9));
-  if (complex) dpEps *= 0.70;                           // 复杂图：简化收 30%，保曲线角点（动漫发丝/眼睛轮廓需要）
-  else if (inkRatio < 0.20 && contrast > 60) dpEps *= 0.82;  // 动漫特征（细线+高对比+低墨量）：也收 18%，比复杂图稍松但比照片紧
+  if (complex) dpEps *= 0.65;                           // 复杂图：简化收 35%，保曲线角点
+  else if (animeLike) dpEps *= 0.78;                    // 动漫特征：收 22%
   // --- thrOff ---
-  // If darkest is very dark and Otsu will naturally fall low,
-  // push thr slightly negative only if content looks overexposed (meanLum high).
   let thrOff = 0;
-  if (meanLum > 155 && contrast < 110) thrOff = -15;   // faint sketch, lower threshold to catch more
-  else if (meanLum < 80) thrOff = +10;                 // too-dark image, raise threshold to prevent blob-ink
+  if (meanLum > 155 && contrast < 110) thrOff = -15;
+  else if (meanLum < 80) thrOff = +10;
+  if (complex) thrOff -= 10;                             // 复杂图：阈值降 10，让更多细线进入墨掩码
+  else if (animeLike) thrOff -= 6;                       // 动漫图：阈值降 6
   thrOff = Math.max(-40, Math.min(30, thrOff));
   // --- bridge auto ---
-  // Small gaps when inkRatio is moderate AND sketch looks thin (inkRatio low). Default 1 for safety, 2 for sketchy AI lineart meanLum high-low contrast.
   let bridge = 1;
   if (contrast < 70 || (meanLum > 140 && inkRatio < 0.18)) bridge = 2;
+  if (complex) bridge = 2;                               // 复杂图：桥接 2 格，让更多线闭合→更多暗区还原
   if (inkRatio > 0.5) bridge = 0;
-  bridge = Math.max(0, Math.min(2, bridge));
+  bridge = Math.max(0, Math.min(3, bridge));
   // --- minLen auto ---
-  // AI sketchy linearts generate lots of tiny whiskers; need higher minLen.
-  // Photos / solid blobs need low minLen to preserve inner rings.
   let minLen = 3;
   if (contrast < 80 && inkRatio < 0.22) minLen = 5;
   if (inkRatio > 0.35) minLen = 2;
-  if (complex) minLen = Math.min(minLen, 2);            // 复杂图：保留短笔画（发丝细节）
+  if (complex) minLen = 2;                               // 复杂图：保留短笔画（发丝细节）
   minLen = Math.max(2, Math.min(6, minLen));
   // --- fill strength (1..6) auto ---
-  // Dark-heavy images want dense (5-6). Mid-gray gradients want balanced (3-4). Line-art almost no solid, keep light (2).
   let fillStrength = 3;
-  if (inkRatio > 0.35) fillStrength = 5;                // heavy solid -> dense
-  else if (inkRatio < 0.12) fillStrength = 2;           // pure line drawing -> sparse if any
-  if (contrast < 85) fillStrength = Math.min(6, fillStrength + 1); // gradient-heavy -> denser
+  if (inkRatio > 0.35) fillStrength = 5;
+  else if (inkRatio < 0.12) fillStrength = 2;
+  if (complex) fillStrength = 4;                          // 复杂图：密填充，还原明暗层次
+  else if (animeLike) fillStrength = 3;                  // 动漫图：中等
+  if (contrast < 85) fillStrength = Math.min(6, fillStrength + 1);
   fillStrength = Math.max(1, Math.min(6, fillStrength));
   // --- fillMin auto ---
   // Don't fill anything smaller than 0.06% of grid cells or 150 cells whichever bigger.
@@ -2405,6 +2415,7 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   const G = gridW * gridW;
   let fillMin = Math.max(150, Math.round(G * 0.0006));
   if (inkRatio > 0.45) fillMin = Math.max(400, Math.round(G * 0.0018));
+  if (complex) fillMin = Math.max(100, Math.round(G * 0.0004));   // 复杂图：更小的暗区也填
   fillMin = Math.min(5000, fillMin);
   // --- bgTol auto ---
   // Simple: lower if border is very clean white, higher if border is noisy (textured bg, scanned paper).
@@ -2432,13 +2443,13 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   // --- protectR auto (eye-white halo during fill) ---
   // Always default mild on so users see good result on the first click. Boost when fill is dense.
   let protectR = 2;
-  if (fillStrength >= 5) protectR = 3;                   // dense hatch -> we're filling aggressively
-  if (inkRatio < 0.12 && fillStrength <= 2) protectR = 1;// pure light line drawing: less fill -> smaller halo
-  if (inkRatio > 0.5) protectR = 3;                      // heavy solid, more chance to smother small holes
+  if (fillStrength >= 5) protectR = 3;
+  if (inkRatio < 0.12 && fillStrength <= 2) protectR = 1;
+  if (inkRatio > 0.5) protectR = 3;
+  if (complex) protectR = 1;                               // 复杂图：护眼色半径收 1，别吞眼睑/睫毛线
   protectR = Math.max(0, Math.min(8, protectR));
   // line-relifer 增强模型：动漫图（细线+高对比+低墨量）默认开，不只是 complex。
   // 动漫线稿的锐利度本身就是质量核心，不管复杂度都需要。
-  const animeLike = inkRatio < 0.20 && contrast > 60;
   return {
     gridW, dpEps, thrOff, bridge, minLen, fillStrength, fillMin, bgTol, deburr, deArea, protectR,
     enh: complex || animeLike,
@@ -2922,34 +2933,34 @@ function convert(o) {
   }
   applyFill(fillSrcM, fillLumG);
   window.__ph.push(['applyFill', Math.round(performance.now() - t0)]); console.log('[PH]', 'applyFill', window.__ph[window.__ph.length - 1][1], 'quads', JSON.stringify(o._quadInfo));
-  // ===== 全局体积预算：先筛极短笔画，再按需温和放大 eps，杜绝粗暴砍细节 =====
-  // 第 0 轮原始参数；第 1 轮过滤极短路径（≤2 顶点）；第 2+ 轮再温和放大 eps
-  // （避免一刀切从 eps 1.36→1.97 损失曲线角点的粗暴做法）。
+  // ===== 全局体积预算：逐级升筛阈值，最后才放大 eps，最大限度保曲线角点 =====
+  // Pass 0 原始；Pass 1 过滤 ≤2 顶点（1 线段噪点）；Pass 2 过滤 ≤3 顶点（单折角短笔画）；
+  // Pass 3+ 才温和放大 eps ×1.18/轮。这样高 gridW 下也尽量靠"丢噪点"而非"砍角点"省字节。
   const fillSegs = segs.splice(detailSegN0);
   const BLK_OVERHEAD_EST = 3500;
   let budgetPasses = 0, detailCur = smooth, budgetEps = o.dpEps;
-  let budgetFilterShort = false;
+  const SHORT_FILTERS = [2, 3];   // 顶点数阈值递增
+  let shortIdx = 0;
   for (;;) {
     segs.length = 0;
     for (const s of detailCur) emitPolyline(s, false, false);
     for (const fs of fillSegs) segs.push(fs);
     let bytes = BLK_OVERHEAD_EST + (o.quads ? o.quads.length : 0);
     for (const s of segs) bytes += s[1].length;
-    if (bytes <= BLK_SIZE_LIMIT || budgetPasses >= 4 || !detailCur.length) break;
+    if (bytes <= BLK_SIZE_LIMIT || budgetPasses >= 5 || !detailCur.length) break;
     budgetPasses++;
-    // Pass 1: 过滤极短路径（≤2 顶点的短笔画是噪点，丢了不伤筋）
-    if (budgetPasses === 1) {
-      budgetFilterShort = true;
-      detailCur = smooth.filter(s => s.length > 2);
+    // 先两轮递增过滤极短路径，再放大 eps
+    if (shortIdx < SHORT_FILTERS.length) {
+      const thr = SHORT_FILTERS[shortIdx++];
+      detailCur = smooth.filter(s => s.length > thr);
       budgetEps = o.dpEps;
     } else {
-      // Pass 2-4: 温和放大 eps（每轮 ×1.25，比原来 ×1.45 保守得多）
-      budgetEps = o.dpEps * Math.pow(1.25, budgetPasses - 1);
+      budgetEps = o.dpEps * Math.pow(1.18, budgetPasses - SHORT_FILTERS.length);
       detailCur = [];
       for (const s of smooth) { const r = dpOpen(s, budgetEps); if (r.length >= 2) detailCur.push(r); }
     }
   }
-  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2), budgetFilterShort ? '(filter-short)' : '');
+  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2), 'shortFilter', SHORT_FILTERS.slice(0, shortIdx).join(','));
   flushSegs();
   window.__ph.push(['flush', Math.round(performance.now() - t0)]); console.log('[PH]', 'flush', window.__ph[window.__ph.length - 1][1], 'segs', segCount);
   const quadInfo = o._quadInfo || { quads: 0, bytes: 0, blobs: 0, fail: 0, skip: 0, active: false };

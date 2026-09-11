@@ -1969,12 +1969,30 @@ const sketchSessions = {};
 const modelBytesCache = {};  // 内存级字节缓存（本次会话内复用）
 // 带进度显示的模型下载（避免网慢时永远卡在"正在加载模型"）
 // 模型会持久缓存到 Cache API —— 首次下载后，之后的访问零等待
+// 多路 URL fallback：jsdelivr CDN → Cloudflare CDN → Pages 同源
+// 用逻辑名 cacheKey 统一缓存（不管从哪个 CDN 拉的都用同一个 key）
+const MODEL_CDN_BASES = [
+  'https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/',
+  'https://cdnjs.cloudflare.com/ajax/libs/github/',  // cdnjs 不直接托管 repo，占位
+  './'  // 当前页同源（本地 serve 或 Pages）
+];
+
 async function fetchModelWithProgress(url, label, silent) {
+  // 统一 cache key：model/line-drawings.onnx
+  const cacheKey = url;
+  // 候选 URL 列表
+  const candidates = [];
+  // 如果 jsdelivr 可用，用它（国内 CDN 节点多）
+  if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    candidates.push('https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/' + url);
+  }
+  candidates.push(url);  // 最后 fallback 到同源
+
   let cache = null;
-  try { cache = await caches.open('wt-ss-models'); } catch (e) { /* file:// 或不支持则跳过 */ }
+  try { cache = await caches.open('wt-ss-models'); } catch (e) { }
   if (cache) {
     try {
-      const hit = await cache.match(url);
+      const hit = await cache.match(cacheKey);
       if (hit) {
         if (!silent) setStatus('读取缓存模型 ' + label + '…', 'busy');
         const buf = await hit.arrayBuffer();
@@ -1982,33 +2000,53 @@ async function fetchModelWithProgress(url, label, silent) {
       }
     } catch (e) { }
   }
-  if (modelBytesCache[url]) return modelBytesCache[url];
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('模型下载失败 HTTP ' + res.status + '：' + url);
-  const total = +(res.headers.get('content-length') || 0);
-  let bytes;
-  if (!res.body || !total) {
-    bytes = new Uint8Array(await res.arrayBuffer());
-  } else {
-    const reader = res.body.getReader();
-    const chunks = []; let got = 0, lastUpd = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value); got += value.length;
-      const now = performance.now();
-      if (now - lastUpd > 300 && !silent) {
-        lastUpd = now;
-        setStatus('正在下载模型 ' + label + ' ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB…', 'busy');
+  if (modelBytesCache[cacheKey]) return modelBytesCache[cacheKey];
+
+  let lastErr = null;
+  for (let ci = 0; ci < candidates.length; ci++) {
+    const fullUrl = candidates[ci];
+    const fromCdn = ci === 0 ? '（CDN加速）' : ci > 0 ? '（备用源 ' + (ci + 1) + '/' + candidates.length + '）' : '';
+    try {
+      if (!silent) setStatus('正在下载模型 ' + label + ' ' + fromCdn + '…', 'busy');
+      const res = await fetch(fullUrl, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const total = +(res.headers.get('content-length') || 0);
+      let bytes;
+      if (!res.body || !total) {
+        bytes = new Uint8Array(await res.arrayBuffer());
+      } else {
+        const reader = res.body.getReader();
+        const chunks = []; let got = 0, lastUpd = 0, noProgressMs = 0;
+        const PROGRESS_TIMEOUT_MS = 10000;  // 10 秒无进度就换源
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value); got += value.length;
+          const now = performance.now();
+          if (now - lastUpd > 300 && !silent) {
+            lastUpd = now;
+            setStatus('正在下载模型 ' + label + ' ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB ' + fromCdn, 'busy');
+          }
+          if (now - lastUpd > PROGRESS_TIMEOUT_MS && got < total * 0.99) {
+            throw new Error('下载卡住（10秒无进度）');
+          }
+        }
+        bytes = new Uint8Array(got);
+        let off = 0;
+        for (const ch of chunks) { bytes.set(ch, off); off += ch.length; }
       }
+      modelBytesCache[cacheKey] = bytes;
+      if (cache) { try { await cache.put(cacheKey, new Response(bytes.slice().buffer)); } catch (e) { } }
+      return bytes;
+    } catch (e) {
+      lastErr = e;
+      console.warn('[fetchModel] ' + label + ' 源' + ci + '失败: ' + e.message + '，尝试下一个…');
+      if (ci < candidates.length - 1) continue;
+      // 所有源都失败
+      throw new Error('模型 ' + label + ' 下载失败（已尝试 ' + candidates.length + ' 个源）：' + e.message + '\n建议：1) 多等一会儿  2) 用 serve.ps1 本地运行速度最快');
     }
-    bytes = new Uint8Array(got);
-    let off = 0;
-    for (const ch of chunks) { bytes.set(ch, off); off += ch.length; }
   }
-  modelBytesCache[url] = bytes;
-  if (cache) { try { await cache.put(url, new Response(bytes.slice().buffer)); } catch (e) { } }
-  return bytes;
+  throw lastErr;
 }
 async function getSketchSession(name) {
   if (sketchSessions[name]) return sketchSessions[name];

@@ -1969,20 +1969,11 @@ const sketchSessions = {};
 const modelBytesCache = {};  // 内存级字节缓存（本次会话内复用）
 // 带进度显示的模型下载（避免网慢时永远卡在"正在加载模型"）
 // 模型会持久缓存到 Cache API —— 首次下载后，之后的访问零等待
-// 多路 URL fallback：jsdelivr CDN → Cloudflare CDN → Pages 同源
-// 用逻辑名 cacheKey 统一缓存（不管从哪个 CDN 拉的都用同一个 key）
-const MODEL_CDN_BASES = [
-  'https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/',
-  'https://cdnjs.cloudflare.com/ajax/libs/github/',  // cdnjs 不直接托管 repo，占位
-  './'  // 当前页同源（本地 serve 或 Pages）
-];
-
 async function fetchModelWithProgress(url, label, silent) {
   // 统一 cache key：model/line-drawings.onnx
   const cacheKey = url;
-  // 候选 URL 列表
+  // 候选 URL 列表：jsdelivr 优先（国内 CDN 节点多）→ 同源 fallback
   const candidates = [];
-  // 如果 jsdelivr 可用，用它（国内 CDN 节点多）
   if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
     candidates.push('https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/' + url);
   }
@@ -2002,13 +1993,17 @@ async function fetchModelWithProgress(url, label, silent) {
   }
   if (modelBytesCache[cacheKey]) return modelBytesCache[cacheKey];
 
-  let lastErr = null;
+  const TOTAL_TIMEOUT_MS = 60000;  // 每个源最多 60 秒，超时换源
+  const PROGRESS_STALL_MS = 15000;  // 15 秒无进度触发换源
+
   for (let ci = 0; ci < candidates.length; ci++) {
     const fullUrl = candidates[ci];
-    const fromCdn = ci === 0 ? '（CDN加速）' : ci > 0 ? '（备用源 ' + (ci + 1) + '/' + candidates.length + '）' : '';
+    const fromCdn = ci === 0 ? '（CDN加速）' : '（备用源）';
+    const ab = new AbortController();
+    const totalTimer = setTimeout(() => ab.abort(), TOTAL_TIMEOUT_MS);
     try {
       if (!silent) setStatus('正在下载模型 ' + label + ' ' + fromCdn + '…', 'busy');
-      const res = await fetch(fullUrl, { cache: 'no-cache' });
+      const res = await fetch(fullUrl, { signal: ab.signal, cache: 'no-cache' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const total = +(res.headers.get('content-length') || 0);
       let bytes;
@@ -2016,8 +2011,7 @@ async function fetchModelWithProgress(url, label, silent) {
         bytes = new Uint8Array(await res.arrayBuffer());
       } else {
         const reader = res.body.getReader();
-        const chunks = []; let got = 0, lastUpd = 0, noProgressMs = 0;
-        const PROGRESS_TIMEOUT_MS = 10000;  // 10 秒无进度就换源
+        const chunks = []; let got = 0, lastUpd = 0, lastProgress = 0;
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -2027,9 +2021,11 @@ async function fetchModelWithProgress(url, label, silent) {
             lastUpd = now;
             setStatus('正在下载模型 ' + label + ' ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB ' + fromCdn, 'busy');
           }
-          if (now - lastUpd > PROGRESS_TIMEOUT_MS && got < total * 0.99) {
-            throw new Error('下载卡住（10秒无进度）');
+          // 总时间到或 15 秒完全没增长 → abort 换源
+          if (now - lastProgress > PROGRESS_STALL_MS && got < total * 0.99) {
+            throw new Error('下载卡住（15秒无增长）');
           }
+          lastProgress = now;
         }
         bytes = new Uint8Array(got);
         let off = 0;
@@ -2039,14 +2035,24 @@ async function fetchModelWithProgress(url, label, silent) {
       if (cache) { try { await cache.put(cacheKey, new Response(bytes.slice().buffer)); } catch (e) { } }
       return bytes;
     } catch (e) {
-      lastErr = e;
-      console.warn('[fetchModel] ' + label + ' 源' + ci + '失败: ' + e.message + '，尝试下一个…');
-      if (ci < candidates.length - 1) continue;
+      clearTimeout(totalTimer);
+      const name = ci === 0 ? 'jsdelivr CDN' : '当前站点';
+      const isAbort = e.name === 'AbortError' || e.message?.includes('abort') || e.message?.includes('超时') || e.message?.includes('卡住');
+      console.warn('[fetchModel] ' + label + ' ' + name + '失败: ' + (e.message || e));
+      if (ci < candidates.length - 1) {
+        if (!silent) setStatus(name + '下载' + (isAbort ? '超时' : '失败') + '，切换到备用源…', 'busy');
+        continue;
+      }
       // 所有源都失败
-      throw new Error('模型 ' + label + ' 下载失败（已尝试 ' + candidates.length + ' 个源）：' + e.message + '\n建议：1) 多等一会儿  2) 用 serve.ps1 本地运行速度最快');
+      const msg = (e && e.message) || String(e);
+      throw new Error('模型 ' + label + ' 下载失败（已尝试所有源）：' + msg +
+        '\n\n国内网络请用本地服务器：双击 serve.ps1 → 访问 http://127.0.0.1:18926/wt-sight-studio.html' +
+        '\n（模型只需下载一次，之后浏览器会自动缓存）');
+    } finally {
+      clearTimeout(totalTimer);
     }
   }
-  throw lastErr;
+  throw new Error('模型 ' + label + ' 下载失败：无可用源');
 }
 async function getSketchSession(name) {
   if (sketchSessions[name]) return sketchSessions[name];
@@ -5040,8 +5046,9 @@ function doGenerate({ retuneAuto, buttonLabel }) {
         console.log('[v2.3 doGenerate] aiSketch done, recursing...');
         doGenerate({ retuneAuto, buttonLabel }); // 线稿替换完 img 后再递归一次
       } catch (e) {
+        const msg = (e && e.message) || (typeof e === 'string' ? e : String(e)) || e?.toString?.() || '未知错误';
         console.error('[v2.3 doGenerate] aiSketch FAILED:', e);
-        setStatus('AI 转线稿失败：' + e.message + '（请改用 XDoG 或上传已转好的线稿）', 'err');
+        setStatus('AI 转线稿失败：' + msg + '（请改用 XDoG 或上传已转好的线稿）', 'err');
         go.disabled = false; if (goM) goM.disabled = false;
       }
     }, 30);

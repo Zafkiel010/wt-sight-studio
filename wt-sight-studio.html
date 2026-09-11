@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WT Sight Studio v2.7 · 战雷瞄具生成器</title>
+<title>WT Sight Studio v0.2 · 战雷瞄具生成器</title>
 <!-- Unlock SharedArrayBuffer for ONNX multi-threading on headerless hosts (GitHub Pages) -->
 <script src="coi-serviceworker.js"></script>
 <style>
@@ -4570,9 +4570,9 @@ function buildCompactBlkFromBlkPaths(paths, headerLines, byteBudget, options) {
   return { raw, segCount: cnt, pathCount: work.length, trimmed: greedyTrimmed };
 }
 
-// buildTraceBlk：紧凑格式 + 字节预算闭环（v2.7）
+// buildTraceBlk：紧凑格式 + 字节预算闭环（v0.2）
 // 和 getCompressedPaths 用完全相同的算法确保一致性
-const BUILD_TRACE_BLK_VERSION = 'v2.7';
+const BUILD_TRACE_BLK_VERSION = 'v0.2';
 function buildTraceBlk(o) {
   console.log('[buildTraceBlk] version=' + BUILD_TRACE_BLK_VERSION);
   // === NaN 防护：sight 参数必须有效 ===
@@ -7149,7 +7149,7 @@ function studioExportToManual() {
   setStatus('工作台已应用：' + newLines.length + ' 条扫描线导入手动层', 'ok');
 }
 
-// 从工作台直接导出 .blk —— 矢量直出版（v2.7）
+// 从工作台直接导出 .blk —— 矢量直出版（v0.2）
 // 手绘笔画：studio.strokes 本来就是矢量点序列 → 直接映射输出（天然连续、数据量小、不扫描！）
 // AI 底图：像素 → 骨架化路径追踪（和主 trace 同管线）
 // 两路合并后走 buildCompactBlkFromBlkPaths 字节预算闭环（≤820KB，绝不砍尾=不砍腿）
@@ -7330,7 +7330,7 @@ function studioExportBlk() {
 }
 
 // studio 画布 → 骨架化 → 路径追踪 → 紧凑格式 blk
-const STUDIO_EXPORT_VERSION = 'v2.6.3';
+const STUDIO_EXPORT_VERSION = 'v0.2';
 function studioCanvasToBlk() {
   const W = studio.W, H = studio.H;
   console.log('[studioExport] version=' + STUDIO_EXPORT_VERSION + ' pipeline canvas=' + W + 'x' + H + ' (userCanvas-only + alpha check + unified compression)');

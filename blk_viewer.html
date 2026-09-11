@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>WT .blk 查看器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a1a; color: #e0e0e0; min-height: 100vh; }
+  header { padding: 16px 24px; background: #252525; border-bottom: 2px solid #444; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 20px; font-weight: 600; color: #4fc3f7; }
+  .info { font-size: 13px; color: #888; }
+  .info span { margin-right: 12px; }
+  .info .ok { color: #66bb6a; }
+  .info .warn { color: #ffa726; }
+  .info .err { color: #ef5350; }
+  main { padding: 20px; display: flex; gap: 20px; flex-wrap: wrap; }
+  .panel { background: #252525; border-radius: 8px; padding: 16px; flex: 1; min-width: 400px; }
+  .panel h2 { font-size: 14px; margin-bottom: 12px; color: #90caf9; text-transform: uppercase; letter-spacing: 1px; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  button, select, input[type=file] { background: #333; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  button:hover, select:hover { background: #444; border-color: #666; }
+  button.primary { background: #1976d2; border-color: #1976d2; }
+  button.primary:hover { background: #1565c0; }
+  input[type=file] { padding: 4px; }
+  .canvas-wrap { background: #000; border-radius: 4px; overflow: hidden; position: relative; width: 100%; aspect-ratio: 16/9; }
+  canvas { display: block; width: 100%; height: 100%; }
+  .canvas-wrap .overlay { position: absolute; top: 8px; right: 8px; font-size: 11px; color: #888; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 3px; font-family: monospace; }
+  .stats { font-family: Consolas, monospace; font-size: 12px; line-height: 1.7; color: #bbb; background: #1a1a1a; padding: 12px; border-radius: 4px; max-height: 300px; overflow: auto; }
+  .stats .kv { display: flex; justify-content: space-between; }
+  .stats .k { color: #888; }
+  .stats .v { color: #4fc3f7; }
+  .stats .warn-v { color: #ffa726; }
+  .stats .err-v { color: #ef5350; }
+  .section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #333; }
+  .section:last-child { border-bottom: none; }
+  .sample-list { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sample-list button { padding: 4px 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 WT .blk 查看器</h1>
+  <div class="info">
+    <span id="fileInfo">未加载文件</span>
+    <span id="sizeInfo">-</span>
+    <span id="segInfo">-</span>
+    <span id="braceInfo">-</span>
+  </div>
+</header>
+<main>
+  <div class="panel" style="max-width:800px;">
+    <h2>🎮 WT 渲染预览 (1:1 游戏坐标系)</h2>
+    <div class="controls">
+      <input type="file" id="blkFile" accept=".blk,.txt" style="font-size:12px;">
+      <button class="primary" onclick="document.getElementById('blkFile').click()">📁 导入 .blk</button>
+      <button onclick="parseAndRender()">🔄 重新渲染</button>
+      <label style="font-size:12px;color:#aaa;display:flex;align-items:center;gap:4px;">
+        线宽: <select id="lwSelect"><option value="0.5">0.5</option><option value="1" selected>1.0</option><option value="1.5">1.5</option><option value="2">2.0</option></select>
+      </label>
+      <label style="font-size:12px;color:#aaa;display:flex;align-items:center;gap:4px;">
+        显示方式: <select id="renderMode"><option value="black" selected>黑线</option><option value="white">白线(暗背景)</option><option value="grid">网格+线</option></select>
+      </label>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="wtCanvas" width="1920" height="1080"></canvas>
+      <div class="overlay">1920×1080 | WT x∈[-0.5,0.5] y∈[-0.28125,0.28125]</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>📊 数据统计 & 诊断</h2>
+    <div class="controls">
+      <button onclick="checkBounds()">🔍 越界检查</button>
+      <button onclick="showPathCount()">📈 路径统计</button>
+    </div>
+    <div class="stats" id="stats">
+      导入 .blk 文件查看详情...
+    </div>
+    <div class="section" style="margin-top:12px;">
+      <div style="color:#888;font-size:12px;margin-bottom:6px;">快速测试（用主站生成的 .blk）：</div>
+      <div class="sample-list">
+        <button onclick="loadFromServer('trace')">trace 模式</button>
+        <button onclick="loadFromServer('normal')">normal 模式</button>
+      </div>
+    </div>
+    <div class="section" style="margin-top:12px;">
+      <div style="color:#888;font-size:12px;margin-bottom:6px;">WT 游戏限制：</div>
+      <div style="font-size:12px;color:#bbb;line-height:1.8;">
+        • .blk 大小上限：<span style="color:#ffa726;">853,135 字节</span><br>
+        • WT 坐标范围：x ∈ [-0.5, 0.5]，y ∈ [-0.28125, 0.28125]<br>
+        • 每段格式：line{line:p4=x1,y1,x2,y2;move:b=bool;}<br>
+        • move:b=true = 抬笔到新起点，false/省略 = 连续画<br>
+        • drawLines{...} 必须正确闭合<br>
+        • 解析器遇语法错误直接跳过整个文件
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+// ============= WT 常量（和游戏内完全一致） =============
+const WT_X_MIN = -0.5, WT_X_MAX = 0.5;
+const WT_Y_MIN = -0.28125, WT_Y_MAX = 0.28125;
+const BLK_SIZE_LIMIT = 853135;          // WT .blk 硬上限（855183 - 2048 安全余量）
+const BLK_SIZE_LIMIT_RAW = 855183;      // WT 原始硬上限
+const HEADER_ESTIMATE = 1585;            // header 大约占用
+const DRAW_LINES_OVERHEAD = 20;          // drawLines{ + \n + } ≈ 20B
+const CANVAS_W = 1920, CANVAS_H = 1080;
+
+// ============= 状态 =============
+let currentBlkText = null;
+let parsedData = null;
+
+// ============= 从主站拉取（用于快速测试） =============
+async function loadFromServer(mode) {
+  try {
+    const resp = await fetch('/wt-sight-studio.html?v=' + Date.now());
+    if (!resp.ok) { alert('无法连接主站服务器，请先运行 wt-sight-studio.html'); return; }
+    // 简单提示用户先在主站生成好再导入
+    alert('请在主站生成 .blk 后，点击 [📁 导入 .blk] 上传下载的文件。\n\n如果主站已开着，可以直接在主站页面点下载按钮。');
+  } catch(e) {
+    alert('无法连接主站服务器：' + e.message);
+  }
+}
+
+// ============= 文件导入 =============
+// (change 监听和拖拽都在底部统一处理)
+
+function updateFileInfo(name, size) {
+  const okSize = size <= BLK_SIZE_LIMIT;
+  document.getElementById('fileInfo').textContent = name;
+  document.getElementById('sizeInfo').innerHTML = 
+    `大小: ${size.toLocaleString()} / ${BLK_SIZE_LIMIT.toLocaleString()}B <span class="${okSize?'ok':'err'}">(${okSize?'OK':'超限!'})</span>`;
+}
+
+// ============= .blk 解析 =============
+function parseBlk(text) {
+  const result = {
+    lines: [],          // [{ x1,y1,x2,y2, moveBefore, pathIndex, rawText }]
+    braceBalance: 0,
+    braceOk: false,
+    dlBraceBalance: 0,  // drawLines 块内部括号平衡
+    dlBraceOk: false,
+    parseErrors: [],
+    parseWarnings: [],  // 非致命问题
+    totalBytes: text.length,
+    blocks: [],         // 顶层 block 名列表
+    rawSamples: [],     // 前5段+后5段原始文本
+    nanCount: 0,        // NaN 坐标数
+    zeroLenCount: 0,    // 零长度段数
+    dupCount: 0,        // 连续重复段数
+    encoding: 'UTF-8',
+    bom: false,
+    nullBytes: false,
+    yBandCoverage: [],  // 10 条横带每带的段数
+  };
+
+  // 0. 编码检查
+  if (text.charCodeAt(0) === 0xFEFF) { result.bom = true; result.encoding = 'UTF-8 BOM'; }
+  if (text.indexOf('\0') >= 0) { result.nullBytes = true; result.parseWarnings.push('文件含 null 字节 (\\0)，可能导致 WT 解析中断'); }
+
+  // 1. 全局括号平衡
+  let depth = 0, hadNegative = false, negPos = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    if (text[i] === '}') { depth--; if (depth < 0 && !hadNegative) { hadNegative = true; negPos = i; } }
+  }
+  result.braceBalance = depth;
+  result.braceOk = depth === 0 && !hadNegative;
+  if (hadNegative) result.parseErrors.push(`括号在位置 ${negPos} 出现多余的 }（depth 变为负数）`);
+  if (depth > 0) result.parseErrors.push(`文件结尾括号未闭合，缺少 ${depth} 个 }`);
+
+  // 2. 找所有顶层 block（element{...}, drawLines{...}, etc.）
+  const blockRegex = /(\w+)\s*\{/g;
+  let bm;
+  const blockStack = [];
+  let topBlocks = [];
+  for (let i = 0; i < text.length; i++) {
+    // 简单扫描找顶层 block 名
+    if (text[i] === '{') {
+      // 回溯找 block 名
+      let j = i - 1;
+      while (j >= 0 && /\s/.test(text[j])) j--;
+      let nameEnd = j + 1;
+      while (j >= 0 && /\w/.test(text[j])) j--;
+      const name = text.substring(j + 1, nameEnd);
+      if (depth === 0 || blockStack.length === 0) {
+        topBlocks.push({ name, pos: i });
+      }
+      blockStack.push(name);
+      // 匹配闭合
+      let d2 = 1, k = i + 1;
+      while (k < text.length && d2 > 0) {
+        if (text[k] === '{') d2++;
+        if (text[k] === '}') d2--;
+        k++;
+      }
+      if (name === 'drawLines') {
+        result.dlBraceBalance = d2;
+        result.dlBraceOk = d2 === 0;
+        if (d2 !== 0) result.parseErrors.push(`drawLines{ 块内部括号不平衡 (depth=${d2})`);
+      }
+    }
+  }
+  // 去重 + 过滤空名
+  const seen = new Set();
+  result.blocks = topBlocks.filter(b => b.name && !seen.has(b.name) && (seen.add(b.name), true));
+
+  // 3. 找 drawLines{...} 块
+  const dlStart = text.indexOf('drawLines{');
+  if (dlStart < 0) {
+    result.parseErrors.push('未找到 drawLines{ 块——WT 会显示空白瞄具');
+    return result;
+  }
+  // 找匹配的闭合
+  let d = 0, dlEnd = -1;
+  for (let i = dlStart; i < text.length; i++) {
+    if (text[i] === '{') d++;
+    if (text[i] === '}') { d--; if (d === 0) { dlEnd = i + 1; break; } }
+  }
+  if (dlEnd < 0) {
+    result.parseErrors.push('drawLines{ 未闭合！文件被截断或生成错误');
+    return result;
+  }
+  result.dlContentLength = dlEnd - dlStart;
+
+  const dlContent = text.substring(dlStart + 'drawLines{'.length, dlEnd - 1);
+
+  // 4. 解析每个 line{} 段
+  const lineRegex = /line\s*\{\s*line\s*:\s*p4\s*=\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*;\s*(?:move\s*:\s*b\s*=\s*(true|false)\s*;?)?\s*\}/g;
+  let m;
+  let segCount = 0;
+  let pathIndex = 0;
+  let prevSeg = null;
+  const rawSamples = [];
+
+  while ((m = lineRegex.exec(dlContent)) !== null) {
+    const rawText = m[0];
+    const x1 = parseFloat(m[1]), y1 = parseFloat(m[2]);
+    const x2 = parseFloat(m[3]), y2 = parseFloat(m[4]);
+    const moveStr = m[5];
+    const moveBefore = moveStr === 'true';
+
+    // NaN 检查
+    if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) {
+      result.nanCount++;
+      if (result.nanCount <= 3) result.parseWarnings.push(`NaN 坐标: "${rawText.substring(0, 60)}..."`);
+      continue;
+    }
+    // Inf 检查
+    if (!isFinite(x1) || !isFinite(y1) || !isFinite(x2) || !isFinite(y2)) {
+      result.nanCount++;
+      if (result.nanCount <= 3) result.parseWarnings.push(`Inf 坐标: "${rawText.substring(0, 60)}..."`);
+      continue;
+    }
+
+    // 零长度段
+    if (Math.abs(x1 - x2) < 1e-9 && Math.abs(y1 - y2) < 1e-9) {
+      result.zeroLenCount++;
+    }
+
+    // 连续重复段
+    if (prevSeg && Math.abs(prevSeg.x1 - x1) < 1e-9 && Math.abs(prevSeg.y1 - y1) < 1e-9 &&
+        Math.abs(prevSeg.x2 - x2) < 1e-9 && Math.abs(prevSeg.y2 - y2) < 1e-9) {
+      result.dupCount++;
+    }
+
+    result.lines.push({ x1, y1, x2, y2, moveBefore, pathIndex, rawText });
+    if (moveBefore) pathIndex++;
+    segCount++;
+
+    // 采样前5段+后5段
+    if (segCount <= 5) rawSamples.push(rawText);
+    prevSeg = { x1, y1, x2, y2 };
+  }
+
+  // 后5段采样
+  if (result.lines.length > 10) {
+    for (let i = result.lines.length - 5; i < result.lines.length; i++) {
+      rawSamples.push(result.lines[i].rawText);
+    }
+  }
+  result.rawSamples = rawSamples;
+
+  // 5. 检测格式异常——有看起来像 line 但没被正则匹配的行
+  const allLineMatches = dlContent.match(/line\s*\{/g);
+  const matchedCount = segCount;
+  const apparentCount = allLineMatches ? allLineMatches.length : 0;
+  if (apparentCount > matchedCount) {
+    result.parseWarnings.push(`格式异常: 发现 ${apparentCount} 个 "line{" 但只成功解析 ${matchedCount} 个——可能有格式错误的段`);
+    // 找出第一个未匹配的
+    const partialRegex = /line\s*\{[^}]*\}/g;
+    let pm;
+    let warned = 0;
+    while ((pm = partialRegex.exec(dlContent)) !== null && warned < 3) {
+      const fullMatch = pm[0];
+      // 尝试用完整正则匹配
+      const testRegex = /^line\s*\{\s*line\s*:\s*p4\s*=\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*;\s*(?:move\s*:\s*b\s*=\s*(true|false)\s*;?)?\s*\}$/;
+      if (!testRegex.test(fullMatch)) {
+        result.parseWarnings.push(`格式错误段: "${fullMatch.substring(0, 80)}${fullMatch.length > 80 ? '...' : ''}"`);
+        warned++;
+      }
+    }
+  }
+
+  // 6. Y 区域覆盖率——10 条横带
+  const NUM_BANDS = 10;
+  result.yBandCoverage = new Array(NUM_BANDS).fill(0);
+  for (const seg of result.lines) {
+    const avgY = (seg.y1 + seg.y2) / 2;
+    const bandIdx = Math.min(NUM_BANDS - 1, Math.max(0, Math.floor((avgY - WT_Y_MIN) / (WT_Y_MAX - WT_Y_MIN) * NUM_BANDS)));
+    result.yBandCoverage[bandIdx]++;
+  }
+
+  result.segCount = segCount;
+  result.pathCount = pathIndex;
+  result.apparentLineCount = apparentCount;
+  return result;
+}
+
+// ============= WT → Canvas 坐标转换 =============
+function wtToCanvas(x, y) {
+  // WT x ∈ [-0.5, 0.5] → canvas [0, 1920]
+  // WT y ∈ [-0.28125, 0.28125] → canvas [0, 1080]
+  return {
+    x: (x - WT_X_MIN) / (WT_X_MAX - WT_X_MIN) * CANVAS_W,
+    y: (y - WT_Y_MIN) / (WT_Y_MAX - WT_Y_MIN) * CANVAS_H
+  };
+}
+
+// ============= 渲染 =============
+function parseAndRender() {
+  if (!currentBlkText) { alert('请先导入 .blk 文件'); return; }
+  
+  parsedData = parseBlk(currentBlkText);
+  document.getElementById('braceInfo').innerHTML = 
+    `括号: <span class="${parsedData.braceOk?'ok':'err'}">depth=${parsedData.braceBalance}</span>` +
+    ` | 段: <span style="color:#4fc3f7">${parsedData.segCount || 0}</span>` +
+    ` | 路径: <span style="color:#4fc3f7">${parsedData.pathCount || 0}</span>`;
+  
+  render();
+  renderStats();
+}
+
+function render() {
+  const canvas = document.getElementById('wtCanvas');
+  const g = canvas.getContext('2d');
+  const mode = document.getElementById('renderMode').value;
+  const lw = parseFloat(document.getElementById('lwSelect').value);
+  
+  // 清屏
+  g.fillStyle = '#1a1a1a';
+  g.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  
+  // 画网格（如果选了 grid 模式）
+  if (mode === 'grid') {
+    g.strokeStyle = '#333';
+    g.lineWidth = 1;
+    // 垂直线 -0.5 ~ 0.5 每 0.05 一格
+    for (let wx = WT_X_MIN; wx <= WT_X_MAX + 0.0001; wx += 0.05) {
+      const cx = wtToCanvas(wx, 0).x;
+      g.beginPath(); g.moveTo(cx, 0); g.lineTo(cx, CANVAS_H); g.stroke();
+    }
+    // 水平线 -0.28125 ~ 0.28125 每 0.05 一格
+    for (let wy = WT_Y_MIN; wy <= WT_Y_MAX + 0.0001; wy += 0.05) {
+      const cy = wtToCanvas(0, wy).y;
+      g.beginPath(); g.moveTo(0, cy); g.lineTo(CANVAS_W, cy); g.stroke();
+    }
+    // 中心点
+    g.strokeStyle = '#555';
+    g.beginPath(); g.moveTo(CANVAS_W/2, 0); g.lineTo(CANVAS_W/2, CANVAS_H); g.stroke();
+    g.beginPath(); g.moveTo(0, CANVAS_H/2); g.lineTo(CANVAS_W, CANVAS_H/2); g.stroke();
+  }
+  
+  // 画 WT 边界框
+  g.strokeStyle = '#4fc3f7';
+  g.lineWidth = 2;
+  g.strokeRect(0, 0, CANVAS_W, CANVAS_H);
+  
+  // 画文件大小进度条（底部）
+  if (parsedData) {
+    const barH = 12, barY = CANVAS_H - barH - 8, barX = 16, barW = CANVAS_W - 32;
+    const capPct = Math.min(100, parsedData.totalBytes / BLK_SIZE_LIMIT * 100);
+    // 背景
+    g.fillStyle = '#333';
+    g.fillRect(barX, barY, barW, barH);
+    // 已用
+    const col = parsedData.totalBytes > BLK_SIZE_LIMIT ? '#ef5350' :
+                capPct > 90 ? '#ffa726' : '#66bb6a';
+    g.fillStyle = col;
+    g.fillRect(barX, barY, barW * capPct / 100, barH);
+    // 边界线
+    g.strokeStyle = '#555';
+    g.lineWidth = 1;
+    g.strokeRect(barX, barY, barW, barH);
+    // 文字
+    g.fillStyle = '#fff';
+    g.font = '11px Consolas, monospace';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(`📦 ${parsedData.totalBytes.toLocaleString()} / ${BLK_SIZE_LIMIT.toLocaleString()}B (${capPct.toFixed(1)}%)  ${parsedData.totalBytes > BLK_SIZE_LIMIT ? '⚠️ 超限 WT 不认!' : '✅'}`, CANVAS_W / 2, barY + barH / 2);
+  }
+  
+  if (!parsedData || !parsedData.lines.length) {
+    g.fillStyle = '#888';
+    g.font = '24px Consolas, monospace';
+    g.textAlign = 'center';
+    g.fillText('无有效线条数据', CANVAS_W/2, CANVAS_H/2);
+    return;
+  }
+  
+  // 画线条
+  const color = mode === 'white' ? '#ffffff' : '#000000';
+  g.strokeStyle = color;
+  g.lineWidth = lw;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  
+  let curPath = -1;
+  for (const seg of parsedData.lines) {
+    if (seg.moveBefore || seg.pathIndex !== curPath) {
+      curPath = seg.pathIndex;
+    }
+    const p1 = wtToCanvas(seg.x1, seg.y1);
+    const p2 = wtToCanvas(seg.x2, seg.y2);
+    
+    if (seg.moveBefore) {
+      // move:b=true → 新路径起点（但还是从 p1 画到 p2，WT 会渲染）
+      g.beginPath();
+      g.moveTo(p1.x, p1.y);
+      g.lineTo(p2.x, p2.y);
+      g.stroke();
+    } else {
+      g.beginPath();
+      g.moveTo(p1.x, p1.y);
+      g.lineTo(p2.x, p2.y);
+      g.stroke();
+    }
+  }
+}
+
+function renderStats() {
+  if (!parsedData) return;
+  const s = parsedData;
+
+  // 坐标范围
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  let oobCount = 0, oobPaths = new Set();
+  for (const seg of s.lines) {
+    minX = Math.min(minX, seg.x1, seg.x2);
+    maxX = Math.max(maxX, seg.x1, seg.x2);
+    minY = Math.min(minY, seg.y1, seg.y2);
+    maxY = Math.max(maxY, seg.y1, seg.y2);
+    const oob = seg.x1 < WT_X_MIN || seg.x1 > WT_X_MAX || seg.y1 < WT_Y_MIN || seg.y1 > WT_Y_MAX ||
+                seg.x2 < WT_X_MIN || seg.x2 > WT_X_MAX || seg.y2 < WT_Y_MIN || seg.y2 > WT_Y_MAX;
+    if (oob) { oobCount++; oobPaths.add(seg.pathIndex); }
+  }
+
+  const capPct = (s.totalBytes / BLK_SIZE_LIMIT * 100).toFixed(1);
+  const avgBytesPerSeg = s.segCount > 0 ? (s.totalBytes / s.segCount).toFixed(1) : 0;
+  const budget = BLK_SIZE_LIMIT - s.totalBytes;
+  const estMaxSegs = Math.floor((BLK_SIZE_LIMIT - HEADER_ESTIMATE - DRAW_LINES_OVERHEAD) / Math.max(1, s.totalBytes - HEADER_ESTIMATE - DRAW_LINES_OVERHEAD) * s.segCount);
+  let html = '';
+
+  // === 基本信息（含预算） ===
+  html += `<div class="section">`;
+  html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">📋 WT .blk 大小限制 & 预算</div>`;
+  html += `<div class="kv"><span class="k">WT 硬上限</span><span class="v">${BLK_SIZE_LIMIT.toLocaleString()}B (原始 ${BLK_SIZE_LIMIT_RAW.toLocaleString()}B)</span></div>`;
+  html += `<div class="kv"><span class="k">当前大小</span><span class="${s.totalBytes>BLK_SIZE_LIMIT?'err-v':'v'}">${s.totalBytes.toLocaleString()}B (${capPct}%)</span></div>`;
+  html += `<div class="kv"><span class="k">剩余预算</span><span class="${budget<0?'err-v':'v'}">${budget.toLocaleString()}B${budget<0?' ⚠️ 超了!':''}</span></div>`;
+  html += `<div class="kv"><span class="k">header 开销</span><span class="v">~${HEADER_ESTIMATE}B (估)</span></div>`;
+  html += `<div class="kv"><span class="k">每段平均</span><span class="v">${avgBytesPerSeg}B / 段</span></div>`;
+  html += `<div class="kv"><span class="k">上限可容纳段数</span><span class="v">≈${estMaxSegs.toLocaleString()} 段 (估算)</span></div>`;
+  // 进度条
+  const barLen = 20;
+  const filled = Math.min(barLen, Math.round(s.totalBytes / BLK_SIZE_LIMIT * barLen));
+  const barChar = s.totalBytes > BLK_SIZE_LIMIT ? '▓' : '█';
+  html += `<div class="kv"><span class="k">可视化</span><span class="${s.totalBytes>BLK_SIZE_LIMIT?'err-v':''}" style="font-family:monospace;letter-spacing:0;">[${barChar.repeat(filled)}${'░'.repeat(barLen-filled)}] ${capPct}%</span></div>`;
+  // 格式效率提示
+  const compactEst = 48, wikiEst = 66;
+  html += `<div style="color:#888;font-size:10px;margin-top:4px;">💡 紧凑格式 ≈${compactEst}B/段 → 上限 ≈${Math.floor((BLK_SIZE_LIMIT-HEADER_ESTIMATE)/compactEst).toLocaleString()} 段 | wiki 空格格式 ≈${wikiEst}B/段 → 上限 ≈${Math.floor((BLK_SIZE_LIMIT-HEADER_ESTIMATE)/wikiEst).toLocaleString()} 段</div>`;
+  html += `</div>`;
+
+  // === 括号检查 ===
+  html += `<div class="section">`;
+  html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">🔗 括号平衡</div>`;
+  html += `<div class="kv"><span class="k">全局</span><span class="${s.braceOk?'v':'err-v'}">depth=${s.braceBalance} ${s.braceOk?'✅':'❌'}</span></div>`;
+  html += `<div class="kv"><span class="k">drawLines 块</span><span class="${s.dlBraceOk?'v':'err-v'}">depth=${s.dlBraceBalance} ${s.dlBraceOk?'✅':'❌'}</span></div>`;
+  html += `</div>`;
+
+  // === 段/路径统计 ===
+  html += `<div class="section">`;
+  html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">📊 段/路径</div>`;
+  html += `<div class="kv"><span class="k">成功解析段数</span><span class="v">${s.segCount.toLocaleString()}</span></div>`;
+  if (s.apparentLineCount > s.segCount) {
+    html += `<div class="kv"><span class="k">检测到 line{ 数</span><span class="warn-v">${s.apparentLineCount} (多 ${s.apparentLineCount - s.segCount} 个格式错误!)</span></div>`;
+  }
+  html += `<div class="kv"><span class="k">独立路径数</span><span class="v">${s.pathCount.toLocaleString()}</span></div>`;
+  html += `<div class="kv"><span class="k">move:b=true (抬笔)</span><span class="v">${s.lines.filter(l=>l.moveBefore).length.toLocaleString()}</span></div>`;
+  html += `<div class="kv"><span class="k">move:b 省略/false</span><span class="v">${s.lines.filter(l=>!l.moveBefore).length.toLocaleString()}</span></div>`;
+  // 路径段数分布
+  const pathSegCounts = {};
+  for (const seg of s.lines) pathSegCounts[seg.pathIndex] = (pathSegCounts[seg.pathIndex] || 0) + 1;
+  const counts = Object.values(pathSegCounts).sort((a,b)=>a-b);
+  if (counts.length) {
+    html += `<div class="kv"><span class="k">段/路径中位数</span><span class="${counts[Math.floor(counts.length/2)]<=1?'warn-v':'v'}">${counts[Math.floor(counts.length/2)]}${counts[Math.floor(counts.length/2)]<=1?' ⚠️ 一半路径是直线!':''}</span></div>`;
+    html += `<div class="kv"><span class="k">段/路径平均</span><span class="v">${(s.segCount/counts.length).toFixed(1)}</span></div>`;
+    const bucket = { '1-2':0, '3-5':0, '6-10':0, '11-30':0, '31+':0 };
+    for (const c of counts) {
+      if (c <= 2) bucket['1-2']++;
+      else if (c <= 5) bucket['3-5']++;
+      else if (c <= 10) bucket['6-10']++;
+      else if (c <= 30) bucket['11-30']++;
+      else bucket['31+']++;
+    }
+    html += `<div class="kv"><span class="k">段数分布</span><span class="v" style="font-size:11px;">1-2:${bucket['1-2']} | 3-5:${bucket['3-5']} | 6-10:${bucket['6-10']} | 11-30:${bucket['11-30']} | 31+:${bucket['31+']}</span></div>`;
+  }
+  html += `</div>`;
+
+  // === 坐标范围 ===
+  if (s.lines.length) {
+    const xCoverage = ((maxX - minX) / (WT_X_MAX - WT_X_MIN) * 100).toFixed(1);
+    const yCoverage = ((maxY - minY) / (WT_Y_MAX - WT_Y_MIN) * 100).toFixed(1);
+    html += `<div class="section">`;
+    html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">🎯 坐标范围</div>`;
+    html += `<div class="kv"><span class="k">X 实际</span><span class="${minX<WT_X_MIN||maxX>WT_X_MAX?'err-v':'v'}">[${minX.toFixed(4)}, ${maxX.toFixed(4)}]</span></div>`;
+    html += `<div class="kv"><span class="k">X 允许</span><span class="v">[${WT_X_MIN}, ${WT_X_MAX}]</span></div>`;
+    html += `<div class="kv"><span class="k">X 覆盖率</span><span class="${parseFloat(xCoverage)<30?'warn-v':'v'}">${xCoverage}%</span></div>`;
+    html += `<div class="kv"><span class="k">Y 实际</span><span class="${minY<WT_Y_MIN||maxY>WT_Y_MAX?'err-v':'v'}">[${minY.toFixed(4)}, ${maxY.toFixed(4)}]</span></div>`;
+    html += `<div class="kv"><span class="k">Y 允许</span><span class="v">[${WT_Y_MIN}, ${WT_Y_MAX}]</span></div>`;
+    html += `<div class="kv"><span class="k">Y 覆盖率</span><span class="${parseFloat(yCoverage)<50?'warn-v':'v'}">${yCoverage}%${parseFloat(yCoverage)<50?' ⚠️ 可能缺下半身':''}</span></div>`;
+    html += `<div class="kv"><span class="k">越界段数</span><span class="${oobCount>0?'err-v':'v'}">${oobCount}${oobCount>0?' (涉及 '+oobPaths.size+' 条路径)':''}</span></div>`;
+    html += `</div>`;
+  }
+
+  // === Y 区域覆盖（关键诊断！检测哪部分是空的） ===
+  if (s.yBandCoverage.length) {
+    html += `<div class="section">`;
+    html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">📏 Y 区域段数分布 (上→下)</div>`;
+    const maxBand = Math.max(...s.yBandCoverage);
+    for (let i = 0; i < s.yBandCoverage.length; i++) {
+      const cnt = s.yBandCoverage[i];
+      const pct = maxBand > 0 ? (cnt / maxBand * 100) : 0;
+      const yLabel = (WT_Y_MIN + (WT_Y_MAX - WT_Y_MIN) * i / 10).toFixed(3);
+      const yLabel2 = (WT_Y_MIN + (WT_Y_MAX - WT_Y_MIN) * (i+1) / 10).toFixed(3);
+      const bar = '█'.repeat(Math.round(pct / 5));
+      const empty = cnt === 0;
+      html += `<div class="kv"><span class="k">y=[${yLabel}, ${yLabel2}]</span><span class="${empty?'err-v':'v'}" style="font-size:11px;">${cnt.toString().padStart(5)} ${bar}${empty?' ❌ 空白!':''}</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  // === 数据质量 ===
+  if (s.nanCount > 0 || s.zeroLenCount > 0 || s.dupCount > 0) {
+    html += `<div class="section">`;
+    html += `<div style="color:#ffa726;font-size:11px;margin-bottom:6px;">⚠️ 数据质量</div>`;
+    if (s.nanCount > 0) html += `<div class="kv"><span class="k">NaN/Inf 坐标</span><span class="err-v">${s.nanCount}</span></div>`;
+    if (s.zeroLenCount > 0) html += `<div class="kv"><span class="k">零长度段</span><span class="warn-v">${s.zeroLenCount}</span></div>`;
+    if (s.dupCount > 0) html += `<div class="kv"><span class="k">连续重复段</span><span class="warn-v">${s.dupCount}</span></div>`;
+    html += `</div>`;
+  }
+
+  // === 错误 ===
+  if (s.parseErrors && s.parseErrors.length) {
+    html += `<div class="section">`;
+    html += `<div style="color:#ef5350;font-size:12px;margin-bottom:4px;">❌ 解析错误 (${s.parseErrors.length})</div>`;
+    for (const err of s.parseErrors) {
+      html += `<div style="color:#ef5350;font-size:11px;word-break:break-all;">• ${err}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  // === 警告 ===
+  if (s.parseWarnings && s.parseWarnings.length) {
+    html += `<div class="section">`;
+    html += `<div style="color:#ffa726;font-size:12px;margin-bottom:4px;">⚠️ 警告 (${s.parseWarnings.length})</div>`;
+    for (const w of s.parseWarnings) {
+      html += `<div style="color:#ffa726;font-size:11px;word-break:break-all;">• ${w}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  // === 原始段采样 ===
+  if (s.rawSamples && s.rawSamples.length) {
+    html += `<div class="section">`;
+    html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">📝 原始段采样 (前5+后5)</div>`;
+    for (let i = 0; i < s.rawSamples.length; i++) {
+      const label = i < 5 ? `段${i+1}` : `段${s.segCount - (s.rawSamples.length - i) + 1}`;
+      html += `<div style="color:#888;font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:2px;">${label}: ${escapeHtml(s.rawSamples[i])}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  // === 结论 ===
+  html += `<div class="section">`;
+  html += `<div style="color:#90caf9;font-size:11px;margin-bottom:6px;">🏁 结论</div>`;
+  const issues = [];
+  if (!s.braceOk) issues.push('括号不平衡');
+  if (s.totalBytes > BLK_SIZE_LIMIT) issues.push('文件超限');
+  if (s.nanCount > 0) issues.push('有NaN坐标');
+  if (s.lines.length === 0) issues.push('无有效线条');
+  if (s.yBandCoverage.length) {
+    const emptyBands = s.yBandCoverage.filter(c => c === 0).length;
+    if (emptyBands > 3) issues.push(`${emptyBands}个Y区域空白`);
+  }
+  if (s.parseErrors.length > 0) issues.push(`${s.parseErrors.length}个解析错误`);
+  if (issues.length === 0) {
+    html += `<div style="color:#66bb6a;font-size:13px;">✅ 未发现明显问题，WT 应能正常加载</div>`;
+  } else {
+    html += `<div style="color:#ef5350;font-size:13px;">❌ 发现 ${issues.length} 个问题：${issues.join('、')}</div>`;
+  }
+  html += `</div>`;
+
+  document.getElementById('stats').innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function checkBounds() {
+  if (!parsedData || !parsedData.lines.length) { alert('请先导入 .blk'); return; }
+  let oobCount = 0, oobPaths = new Set();
+  for (const seg of parsedData.lines) {
+    const oob = seg.x1 < WT_X_MIN || seg.x1 > WT_X_MAX || seg.y1 < WT_Y_MIN || seg.y1 > WT_Y_MAX ||
+                seg.x2 < WT_X_MIN || seg.x2 > WT_X_MAX || seg.y2 < WT_Y_MIN || seg.y2 > WT_Y_MAX;
+    if (oob) { oobCount++; oobPaths.add(seg.pathIndex); }
+  }
+  const minY = Math.min(...parsedData.lines.flatMap(s=>[s.y1,s.y2]));
+  const maxY = Math.max(...parsedData.lines.flatMap(s=>[s.y1,s.y2]));
+  const yCov = ((maxY-minY)/(WT_Y_MAX-WT_Y_MIN)*100).toFixed(1);
+  alert(`越界检查：\n越界段数: ${oobCount}\n涉及路径: ${oobPaths.size}\n\nY 范围: [${minY.toFixed(4)}, ${maxY.toFixed(4)}]\nY 覆盖率: ${yCov}%${parseFloat(yCov)<50?'\n⚠️ Y覆盖率低，可能缺下半身!':''}\n\n总计: ${parsedData.segCount} 段, ${parsedData.pathCount} 路径\n括号: depth=${parsedData.braceBalance} ${parsedData.braceOk?'✅':'❌'}\n\nY区域分布:\n${parsedData.yBandCoverage.map((c,i)=>`  band${i}: ${c}${c===0?' ❌':''}`).join('\n')}`);
+}
+
+function showPathCount() {
+  if (!parsedData) { alert('请先导入 .blk'); return; }
+  alert(`路径统计：\n独立路径数: ${parsedData.pathCount}\n总段数: ${parsedData.segCount}\n平均段/路径: ${(parsedData.segCount/Math.max(1,parsedData.pathCount)).toFixed(1)}`);
+}
+
+// ============= 渲染控制 =============
+document.getElementById('lwSelect').addEventListener('change', render);
+document.getElementById('renderMode').addEventListener('change', render);
+
+// ============= 拖拽导入支持 =============
+const fileInput = document.getElementById('blkFile');
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentBlkText = ev.target.result;
+    updateFileInfo(file.name, currentBlkText.length);
+    parseAndRender();
+  };
+  reader.onerror = () => { alert('读取文件失败: ' + reader.error); };
+  reader.readAsText(file);
+}
+// 重写 change 事件（兼容显示的 file input）
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  handleFile(file);
+});
+// 拖拽
+document.addEventListener('dragover', (e) => { e.preventDefault(); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  // 校验文件
+  const lower = file.name.toLowerCase();
+  if (!lower.endsWith('.blk') && !lower.endsWith('.txt')) {
+    alert('请拖入 .blk 或 .txt 文件');
+    return;
+  }
+  handleFile(file);
+});
+
+// ============= 自动加载：从生成器页面跳过来时，sessionStorage 里有 blk 数据 =============
+(function autoLoadFromSession() {
+  try {
+    const data = sessionStorage.getItem('blk_viewer_data');
+    if (data) {
+      currentBlkText = data;
+      updateFileInfo('from_generator.blk', data.length);
+      parseAndRender();
+      sessionStorage.removeItem('blk_viewer_data');
+      console.log('[blk_viewer] auto-loaded from sessionStorage (' + data.length + ' B)');
+    }
+  } catch (e) {
+    console.warn('[blk_viewer] sessionStorage unavailable:', e);
+  }
+})();
+</script>
+</body>
+</html>

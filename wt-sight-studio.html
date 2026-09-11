@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WT Sight Studio · 战雷瞄具生成器 [Alpha]</title>
+<title>WT Sight Studio v2.7 · 战雷瞄具生成器</title>
 <!-- Unlock SharedArrayBuffer for ONNX multi-threading on headerless hosts (GitHub Pages) -->
 <script src="coi-serviceworker.js"></script>
 <style>
@@ -56,25 +56,11 @@
     animation: studioPulse 3s ease-in-out infinite;
   }
   .studio-entry:hover { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(255,106,0,0.55), 0 0 0 1px rgba(255,255,255,0.25) inset !important; }
-  .oneclick {
-    background: linear-gradient(135deg, #a855f7, #ec4899) !important;
-    color: #fff !important;
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    padding: 14px 18px !important;
-    border-radius: 12px !important;
-    width: 100%;
-    margin-bottom: 8px;
-    box-shadow: 0 2px 14px rgba(168,85,247,0.45), 0 0 0 1px rgba(255,255,255,0.2) inset !important;
-    transition: transform 0.12s, box-shadow 0.12s !important;
-    animation: oneclickPulse 2.6s ease-in-out infinite;
-  }
-  .oneclick:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(236,72,153,0.55), 0 0 0 1px rgba(255,255,255,0.3) inset !important; }
-  .oneclick:disabled { opacity: 0.5; animation: none; }
-  @keyframes oneclickPulse { 0%,100% { box-shadow: 0 2px 14px rgba(168,85,247,0.45), 0 0 0 1px rgba(255,255,255,0.2) inset; } 50% { box-shadow: 0 2px 18px rgba(236,72,153,0.6), 0 0 0 1px rgba(255,255,255,0.25) inset; } }
   @keyframes studioPulse { 0%,100% { box-shadow: 0 2px 12px rgba(255,106,0,0.4), 0 0 0 1px rgba(255,255,255,0.15) inset; } 50% { box-shadow: 0 2px 16px rgba(255,140,0,0.65), 0 0 0 1px rgba(255,255,255,0.25) inset; } }
   .row { display: flex; gap: 8px; margin-top: 10px; }
   .row > button { flex: 1; }
+  .checkline { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--dim); cursor: pointer; user-select: none; }
+  .checkline input { margin: 0; }
   .adv { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; display: none; }
   .adv.open { display: block; }
   .adv h3 { font-size: 12px; color: var(--dim); margin: 10px 0 6px; font-weight: 500; }
@@ -137,6 +123,21 @@
   #studioBar .s-label { font-size: 10px; color: #bbb; display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
   #studioBar .s-label input, #studioBar .s-label select { background: #2a2a2a; border: 1px solid #555; color: #ddd; border-radius: 3px; padding: 3px 4px; font-size: 11px; }
   #studioBar .s-zoom { font-size: 11px; color: #ffcc44; font-family: Consolas, monospace; text-align: center; font-weight: 600; padding: 4px; background: #1a1a1a; border-radius: 3px; }
+  /* 笔画列表面板 */
+  .s-strokes-head { font-size: 11px; color: #ffcc44; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .s-strokes-head #studioStrokeCount { background: #1a1a1a; border-radius: 8px; padding: 0 7px; font-family: Consolas, monospace; color: #ffcc44; }
+  .s-stroke-list { max-height: 132px; overflow-y: auto; background: #2a2a2a; border: 1px solid #444; border-radius: 3px; font-size: 10px; }
+  .s-stroke-row { display: flex; align-items: center; gap: 4px; padding: 3px 5px; color: #ccc; cursor: pointer; border-bottom: 1px solid #333; user-select: none; }
+  .s-stroke-row:hover { background: #3a3a3a; }
+  .s-stroke-row.sel { background: #6a5410; color: #fff; }
+  .s-stroke-row .sr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-stroke-row .sr-x { color: #ff9a9a; font-weight: 700; padding: 0 4px; border-radius: 2px; }
+  .s-stroke-row .sr-x:hover { background: #7a2a2a; color: #fff; }
+  .s-stroke-edit { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #bbb; margin-top: 3px; }
+  .s-stroke-edit input { background: #2a2a2a; border: 1px solid #555; color: #ddd; border-radius: 3px; padding: 2px 3px; font-size: 11px; width: 56px; }
+  .s-mini { background: #5a2a2a; color: #ffd0d0; border: 1px solid #6a3a3a; border-radius: 3px; font-size: 10px; padding: 2px 7px; cursor: pointer; }
+  .s-mini:hover { background: #7a3a3a; }
+  .s-stroke-empty { color: #777; font-size: 10px; padding: 6px 5px; text-align: center; }
   #studioCanvasWrap { flex: 1; position: relative; overflow: visible; background: #1a1a1a; }
   #studioCanvas { background: #ffffff; cursor: crosshair; touch-action: none; image-rendering: pixelated; image-rendering: crisp-edges; max-width: none !important; height: auto !important; }
   #studioCrossOverlay { position: absolute; pointer-events: none; z-index: 5; }
@@ -259,6 +260,12 @@ const I18N_TXT = {
   '自动': 'Auto',
   '导入 .blk 继续编辑': 'Import .blk to edit',
   '导入 .blk': 'Import .blk',
+  '生成模式': 'Mode',
+  '经典模式（视频里的模式。适合简单图像）': 'Classic (video mode. For simple images)',
+  '经典模式（逐行扫描像素，wiki 格式，GitHub 原版）': 'Classic (pixel scan, wiki format)',
+  '描边模式（AI 转线稿 + 骨架追踪，紧凑格式）': 'Trace (AI sketch + skeleton)',
+  '🔍 检查 .blk': '🔍 Check .blk',
+  '描边模式（自动启动 AI 转线稿，适合复杂图像。\n注意，该模式如果你的瞄具放得太大了会有缺失。\n建议先点「检查 .blk」看看有没有报错）': 'Trace (auto AI sketch. For complex images.\nNote: if the sight is scaled too large it may have missing parts.\nClick "Check .blk" first to see if there are errors)',
   // —— 绘画工作台 ——
   '画笔': 'Pen', '像素橡皮': 'Eraser',
   '适合': 'Fit',
@@ -348,6 +355,7 @@ const I18N_TITLE = {
   '拖动/缩放参考底图': 'Drag/scale reference layer',
   '对齐 AI 瞄具到原图位置（Ctrl+Shift+A）': 'Align AI sight to source position (Ctrl+Shift+A)',
   '开关鼠标放大镜': 'Toggle loupe',
+  '在 .blk 查看器中检查生成的瞄具': 'Check the generated sight in .blk viewer',
 };
 let CUR_LANG = 'zh';
 function applyLang(lang) {
@@ -443,7 +451,7 @@ document.addEventListener('click', e => {
 
       <div id="sightWrap">
         <h2 style="margin-top:14px;">③ 战雷瞄具预览 <span style="font-size:11px;color:var(--dim);font-weight:400">（可拖动）</span></h2>
-        <canvas id="sightCanvas" width="1280" height="720"></canvas>
+        <canvas id="sightCanvas" width="1920" height="1080"></canvas>
         <div id="sightBtns">
           <button class="ghost" id="bgDefaultBtn">使用默认战雷准心底图</button>
           <button class="ghost" id="bgPasteBtn">粘贴剪贴板为瞄具底图</button>
@@ -515,12 +523,18 @@ document.addEventListener('click', e => {
 
     <div class="panel panel-sticky">
       <h2>② 生成 & 下载</h2>
-      <button id="goOneClick" class="oneclick" disabled>✨ 一键出</button>
+      <div class="row"><label class="checkline" style="margin-top:0">生成模式
+        <select id="genMode" style="background:#2a3140;color:#e8e8e8;border:1px solid var(--line);border-radius:4px;padding:1px 3px;font-size:11px;max-width:280px">
+          <option value="outline">经典模式（视频里的模式。适合简单图像）</option>
+          <option value="trace" selected>描边模式（自动启动 AI 转线稿，适合复杂图像。&#10;注意，该模式如果你的瞄具放得太大了会有缺失。&#10;建议先点「检查 .blk」看看有没有报错）</option>
+        </select>
+      </label></div>
       <button id="go" disabled>生成瞄具 .blk</button>
       <button id="goManual" class="ghost" disabled>用当前设置生成 .blk</button>
       <button id="studioBtn" class="studio-entry" title="进入独立绘画工作台（中心准心+放大+像素橡皮+手绘描边）">✏️ 绘画工作台</button>
       <div class="row">
         <button id="dl" class="ghost" disabled>下载 .blk 文件</button>
+        <button id="viewerBtn" class="ghost" disabled title="在 .blk 查看器中检查生成的瞄具">🔍 检查 .blk</button>
       </div>
       <div class="row">
         <button id="blkImportBtn" class="ghost">导入 .blk 继续编辑</button>
@@ -585,9 +599,9 @@ document.addEventListener('click', e => {
         <h3>其它 · 高级</h3>
         <div class="chk"><input type="checkbox" id="cross" checked><label for="cross" style="flex:1">保留战雷中心十字准线</label></div>
         <div class="f"><label>瞄具旁文字（留空不显示）</label><input type="text" id="mark" value="" maxlength="6"></div>
-        <div class="f"><label>位置 X（屏幕占比）</label><input type="number" id="x0" value="0.02" min="0" max="0.9" step="0.005"></div>
-        <div class="f"><label>位置 Y（屏幕占比）</label><input type="number" id="y0" value="0.02" min="0" max="0.9" step="0.005"></div>
-        <div class="f"><label>宽度 W（屏幕占比）</label><input type="number" id="w" value="0.20" min="0.05" max="0.6" step="0.005"></div>
+        <div class="f"><label>位置 X（屏幕占比）</label><input type="number" id="x0" value="0.325" min="-0.5" max="1.5" step="0.005"></div>
+        <div class="f"><label>位置 Y（屏幕占比）</label><input type="number" id="y0" value="0" min="-1" max="1.5" step="0.005"></div>
+        <div class="f"><label>宽度 W（屏幕占比）</label><input type="number" id="w" value="0.35" min="0.05" max="1.5" step="0.005"></div>
       </div>
       <div class="row">
         <button id="tgAdv" class="ghost">高级设置 ▾</button>
@@ -605,9 +619,8 @@ document.addEventListener('click', e => {
 const $ = id => document.getElementById(id);
 const drop = $('drop'), file = $('file'), go = $('go'), dl = $('dl');
 const statusEl = $('status'), pv = $('pv'), pvWrap = $('pvWrap'), pvTag = $('pvTag');
-let img = null, lastBlk = '', lastOpts = null;   // lastOpts 供预览画布重绘用
+let img = null, lastBlk = '', lastTraceBlk = '', lastOpts = null;   // lastTraceBlk = AI 自动描边版 .blk
 let srcOriginal = null;   // AI/XDoG 应用前的原始彩图；动漫暗区还原（封闭暗色区域→实心填充）需要原图明暗信息
-let isSketchApplied = false;   // 当前 img 是否已经经过 AI/XDoG 转线稿（决定 go 按钮是否需要先转线稿）
 // War Thunder .blk 坐标基准：屏幕宽度 = 1。屏幕高度因此 = 9/16 ≈ 0.5625。
 // 预览层 y0 / H 比例是相对屏幕高度归一化 (0..1)，写入 blk 时统一乘以本系数转换。
 const Y_BLK_SCALE = 9 / 16;
@@ -796,14 +809,12 @@ function loadFile(f) {
   const url = URL.createObjectURL(f);
   const im = new Image();
   im.onload = () => {
-    img = im; srcOriginal = im; isSketchApplied = false; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
-    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; $('goOneClick').disabled = false; dl.disabled = true;
+    img = im; srcOriginal = im; $('srcName').textContent = f.name + '（' + im.width + '×' + im.height + '）';
+    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
-    let planHint = '';
-    try { const p = autoTuneFromImage(im, 0, 0, 1, 1).plan; if (p) planHint = '（' + p.reason + '）'; } catch (e) {}
-    setStatus('已加载' + planHint + '，点「✨ 一键出」自动出瞄具', 'ok');
+    setStatus('已加载，点「AI 转线稿」预处理，或直接点「生成瞄具 .blk」', 'ok');
   };
   im.onerror = () => setStatus('图片加载失败', 'err');
   im.src = url;
@@ -814,8 +825,8 @@ function loadDefaultSourceImage() {
   const im = new Image();
   im.onload = () => {
     if (img) return; // 用户已手动上传则不覆盖
-    img = im; srcOriginal = im; isSketchApplied = false; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「✨ 一键出」或上传你自己的图片';
-    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; $('goOneClick').disabled = false; dl.disabled = true;
+    img = im; srcOriginal = im; $('srcName').textContent = '默认示例图（' + im.width + '×' + im.height + '）· 可直接点「AI 转线稿」或上传你自己的图片';
+    go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('skRunX').disabled = false; dl.disabled = true;
     drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
     $('sightWrap').style.display = 'block';
     resetSightLayoutToDefaults();
@@ -1713,7 +1724,7 @@ function weldChains(chains, R) {
 // near-white ink residues stay unfilled. Keeps component-size threshold + white
 // holes per blob.
 function buildGradFill(M, lumGW, GW, GH, opts) {
-  const { fillMin, strength, keepHoles=true, protectR=0, solidQuads=false } = opts;  // protectR: dilate hole mask R cells -> exclude from fill (prevents eye-whites being smothered)
+  const { fillMin, strength, keepHoles=true, protectR=0, solidQuads=false, protectMask=null } = opts;  // protectMask: 额外白格区域保护（眼白等），不让 seenW 泛洪覆盖
   const N = GW * GH;
   // (1) component label on M (ink mask)
   const lab = new Int32Array(N).fill(-1); const sizes = []; const stk = [];
@@ -1736,7 +1747,7 @@ function buildGradFill(M, lumGW, GW, GH, opts) {
   for (let c = 0; c < sizes.length; c++) if (sizes[c] >= fillMin) { fillIDs.add(c); blobs++; }
   // (3) white-hole classification: flood border-connected white -> holes = unseen white
   const seenW = new Uint8Array(N); const wst = [];
-  const wseed = k => { if (M[k] || seenW[k]) return; seenW[k] = 1; wst.push(k); };
+  const wseed = k => { if (M[k] || seenW[k] || (protectMask && protectMask[k])) return; seenW[k] = 1; wst.push(k); };
   for (let i = 0; i < GW; i++) { wseed(Idx(i, 0, GW)); wseed(Idx(i, GH - 1, GW)); }
   for (let j = 0; j < GH; j++) { wseed(Idx(0, j, GW)); wseed(Idx(GW - 1, j, GW)); }
   while (wst.length) {
@@ -2030,36 +2041,14 @@ async function getSketchSession(name) {
 async function aiSketch(apply) {
   const size = num('skSize');
   const mode = $('skModel').value;
-  // 智能方案选择：auto 模式下根据图像特征自动选最优模型
-  let plan = null;
-  try { plan = autoTuneFromImage(img, 0, 0, 1, 1).plan; } catch (e) {}
   let enh = mode.indexOf('enh') >= 0;
-  let useXdog = false;
-  if (mode === 'auto') {
-    if (plan && plan.model === 'xdog') {
-      useXdog = true;
-      setStatus('智能方案：' + plan.reason, 'busy');
-    } else {
-      enh = plan ? (plan.model === 'line-drawings_enh') : (mode.indexOf('enh') >= 0);
-      if (plan) setStatus('智能方案：' + plan.reason, 'busy');
-    }
-  }
-  if (useXdog) {
-    // 简单图形/Logo 用 XDoG（xdogSketch 内部读 UI 参数）
-    return xdogSketch(apply);
+  if (mode === 'auto' && !enh) {
+    // 复杂度感知：密集发丝/高边缘密度图自动启用 LineRelifer 增强
+    try { enh = !!autoTuneFromImage(img, 0, 0, 1, 1).enh; } catch (e) { }
+    if (enh) setStatus('检测到高复杂度图像：自动启用线稿增强（更锐利）…', 'busy');
   }
   let W = img.width, H = img.height;
-  // 动漫图精细模式：AI 推理分辨率至少 1536（哪怕原图更小也放大推理，模型能出更细的线）。
-  // 实测 800px 原图在 1536px 下推理，发丝/睫毛细节明显更多。
-  let wantSize = size > 0 ? size : Math.max(W, H);
-  try {
-    const diag = autoTuneFromImage(img, 0, 0, 1, 1).diagnostics;
-    if (diag && (diag.complex || (diag.inkRatio < 0.20 && diag.contrast > 60))) {
-      wantSize = Math.max(wantSize, 1536);
-      if (diag.edgeRatio > 0.20) wantSize = Math.max(wantSize, 2048);
-    }
-  } catch (e) {}
-  const maxSide = Math.min(4096, wantSize);
+  const maxSide = Math.min(4096, size > 0 ? size : Math.max(W, H));
   // 允许放大（小图在更大画布上推理能出更细线条），上限 4096
   const k = maxSide / Math.max(W, H);
   W = Math.max(8, Math.round(W * k / 8) * 8); H = Math.max(8, Math.round(H * k / 8) * 8);
@@ -2116,7 +2105,7 @@ async function aiSketch(apply) {
     bg.drawImage(c, 0, 0);
     const blurred = bg.getImageData(0, 0, OW, OH);
     const orig = g.getImageData(0, 0, OW, OH);
-    const amt = enh ? 1.4 : 1.1;  // 增强模式下更锐利；动漫图默认 1.1（原 0.8）
+    const amt = 0.8;  // 锐化强度 0.5~1.5 之间，默认 0.8 比较安全
     const o = orig.data, b = blurred.data;
     for (let i = 0; i < o.length; i += 4) {
       const diff = (o[i] - b[i]) * amt;
@@ -2132,7 +2121,6 @@ async function aiSketch(apply) {
       const im = new Image();
       im.onload = () => {
         img = im;
-        isSketchApplied = true;   // 标记已转线稿
         $('srcName').textContent = 'AI 线稿（' + im.width + '×' + im.height + '，原图已替换）';
         go.disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
         $('sightWrap').style.display = 'block';
@@ -2142,7 +2130,7 @@ async function aiSketch(apply) {
       im.src = lastSketchUrl;
     });
     pvTag.textContent = 'AI 线稿 ' + W + '×' + H + ' · 推理 ' + secs + 's · 已应用为输入图';
-    setStatus('AI 线稿完成！现在点「生成瞄具 .blk」即可', 'ok');
+    setStatus('AI 线稿完成！点「生成瞄具 .blk」或打开绘画工作台点「AI 自动描边」', 'ok');
   } else {
     const pw = pv.width;
     pv.height = Math.max(60, Math.round(pw * H / W));
@@ -2254,7 +2242,6 @@ async function xdogSketch(apply) {
       const im = new Image();
       im.onload = () => {
         img = im;
-        isSketchApplied = true;   // 标记已转线稿
         $('srcName').textContent = 'XDoG 线稿（' + im.width + '×' + im.height + '，原图已替换）';
         go.disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block';
         $('sightWrap').style.display = 'block';
@@ -2264,7 +2251,7 @@ async function xdogSketch(apply) {
       im.src = lastSketchUrl;
     });
     pvTag.textContent = 'XDoG 线稿 ' + W + '×' + H + ' · σ1=' + sigma1 + ' σ2=' + sigma2 + ' φ=' + phi + ' · ' + secs + 's · 已应用为输入图';
-    setStatus('XDoG 线稿完成（' + secs + 's）！现在点「生成瞄具 .blk」即可', 'ok');
+    setStatus('XDoG 线稿完成（' + secs + 's）！点「生成瞄具 .blk」或打开绘画工作台点「AI 自动描边」', 'ok');
   } else {
     const pw = pv.width;
     pv.height = Math.max(60, Math.round(pw * H / W));
@@ -2281,7 +2268,10 @@ async function xdogSketch(apply) {
 $('skRun').onclick = async () => {
   if (!img) { setStatus('请先上传图片', 'err'); return; }
   const b = $('skRun'); b.disabled = true;
-  try { await aiSketch(true); }
+  try {
+    await aiSketch(true);
+    window.__traceSketchApplied = true; // 手动转完，doGenerate trace 模式不会再重复跑
+  }
   catch (e) { setStatus('转线稿失败：' + e.message, 'err'); console.error(e); }
   b.disabled = false;
 };
@@ -2379,7 +2369,6 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   // 阈值按实测校准（640px 分析宽）：默认瞄具 0.105 / 一般动漫图 0.108 / 精细复杂插画 0.147
   // 动漫线稿是细线+大色块，edgeRatio 天然远低于照片，0.25 会漏判所有二次元图
   const complex = edgeRatio > 0.13;   // 复杂图：启用精细配置曲线
-  const animeLike = inkRatio < 0.20 && contrast > 60;  // 动漫特征：细线+高对比+低墨量
   // --- gridW auto ---
   // Base = 800, +complexity -> 1000..1400.
   // Complex drivers: small pixels (high ink area / lots of contrast), content not too-dense.
@@ -2389,42 +2378,42 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   if (srcDiag > 2400) gridW = 1100;
   if (contrast > 90 && inkRatio < 0.45) gridW += 100;  // sharp lines: push detail
   if (inkRatio > 0.6) gridW -= 120;                     // huge solid areas: less detail needed
-  if (complex) gridW = Math.max(gridW, 1600);           // 复杂图：精度优先，直接 1600 起步
-  if (edgeRatio > 0.20) gridW = Math.max(gridW, 2000);  // 极复杂（密集发丝）：拉满 2000
-  gridW = Math.max(400, Math.min(complex ? 2000 : 1100, gridW));
+  if (complex) gridW = Math.max(gridW, 1200);           // 复杂图：精度优先
+  if (edgeRatio > 0.20) gridW = Math.max(gridW, 1400);  // 极复杂（密集发丝）：再上一档（实测动漫图很难超过 0.25，原 0.40 永远触发不了）
+  gridW = Math.max(400, Math.min(complex ? 1400 : 900, gridW));
   // --- dpEps auto: keep constant screen-space precision ---
   // Target = 0.45 grid cells. Larger grid -> bigger eps in cell units.
   // LINE_STEP=1（不跳顶点）需更高 dpEps 补偿段数：DP 简化保角点，跳点切角点，
   // 同段数下 LINE_STEP=1 + 高 dpEps 比 LINE_STEP=2 + 低 dpEps 精度更高（角点不被切）
   let dpEps = Math.max(0.35, Math.min(2.5, (0.35 + (gridW - 600) / 1400) * 1.9));
-  if (complex) dpEps *= 0.65;                           // 复杂图：简化收 35%，保曲线角点
-  else if (animeLike) dpEps *= 0.78;                    // 动漫特征：收 22%
+  if (complex) dpEps *= 0.92;                           // 复杂图：简化再收 8%，保细节
   // --- thrOff ---
+  // If darkest is very dark and Otsu will naturally fall low,
+  // push thr slightly negative only if content looks overexposed (meanLum high).
   let thrOff = 0;
-  if (meanLum > 155 && contrast < 110) thrOff = -15;
-  else if (meanLum < 80) thrOff = +10;
-  if (complex) thrOff -= 10;                             // 复杂图：阈值降 10，让更多细线进入墨掩码
-  else if (animeLike) thrOff -= 6;                       // 动漫图：阈值降 6
+  if (meanLum > 155 && contrast < 110) thrOff = -15;   // faint sketch, lower threshold to catch more
+  else if (meanLum < 80) thrOff = +10;                 // too-dark image, raise threshold to prevent blob-ink
   thrOff = Math.max(-40, Math.min(30, thrOff));
   // --- bridge auto ---
+  // Small gaps when inkRatio is moderate AND sketch looks thin (inkRatio low). Default 1 for safety, 2 for sketchy AI lineart meanLum high-low contrast.
   let bridge = 1;
   if (contrast < 70 || (meanLum > 140 && inkRatio < 0.18)) bridge = 2;
-  if (complex) bridge = 2;                               // 复杂图：桥接 2 格，让更多线闭合→更多暗区还原
   if (inkRatio > 0.5) bridge = 0;
-  bridge = Math.max(0, Math.min(3, bridge));
+  bridge = Math.max(0, Math.min(2, bridge));
   // --- minLen auto ---
+  // AI sketchy linearts generate lots of tiny whiskers; need higher minLen.
+  // Photos / solid blobs need low minLen to preserve inner rings.
   let minLen = 3;
   if (contrast < 80 && inkRatio < 0.22) minLen = 5;
   if (inkRatio > 0.35) minLen = 2;
-  if (complex) minLen = 2;                               // 复杂图：保留短笔画（发丝细节）
+  if (complex) minLen = Math.min(minLen, 2);            // 复杂图：保留短笔画（发丝细节）
   minLen = Math.max(2, Math.min(6, minLen));
   // --- fill strength (1..6) auto ---
+  // Dark-heavy images want dense (5-6). Mid-gray gradients want balanced (3-4). Line-art almost no solid, keep light (2).
   let fillStrength = 3;
-  if (inkRatio > 0.35) fillStrength = 5;
-  else if (inkRatio < 0.12) fillStrength = 2;
-  if (complex) fillStrength = 4;                          // 复杂图：密填充，还原明暗层次
-  else if (animeLike) fillStrength = 3;                  // 动漫图：中等
-  if (contrast < 85) fillStrength = Math.min(6, fillStrength + 1);
+  if (inkRatio > 0.35) fillStrength = 5;                // heavy solid -> dense
+  else if (inkRatio < 0.12) fillStrength = 2;           // pure line drawing -> sparse if any
+  if (contrast < 85) fillStrength = Math.min(6, fillStrength + 1); // gradient-heavy -> denser
   fillStrength = Math.max(1, Math.min(6, fillStrength));
   // --- fillMin auto ---
   // Don't fill anything smaller than 0.06% of grid cells or 150 cells whichever bigger.
@@ -2432,7 +2421,6 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   const G = gridW * gridW;
   let fillMin = Math.max(150, Math.round(G * 0.0006));
   if (inkRatio > 0.45) fillMin = Math.max(400, Math.round(G * 0.0018));
-  if (complex) fillMin = Math.max(100, Math.round(G * 0.0004));   // 复杂图：更小的暗区也填
   fillMin = Math.min(5000, fillMin);
   // --- bgTol auto ---
   // Simple: lower if border is very clean white, higher if border is noisy (textured bg, scanned paper).
@@ -2459,40 +2447,15 @@ function autoTuneFromImage(img, cL, cT, cR, cB) {
   deArea = Math.max(0, Math.min(400, deArea));
   // --- protectR auto (eye-white halo during fill) ---
   // Always default mild on so users see good result on the first click. Boost when fill is dense.
-  let protectR = 2;
-  if (fillStrength >= 5) protectR = 3;
-  if (inkRatio < 0.12 && fillStrength <= 2) protectR = 1;
-  if (inkRatio > 0.5) protectR = 3;
-  if (complex) protectR = 1;                               // 复杂图：护眼色半径收 1，别吞眼睑/睫毛线
+  let protectR = 3;
+  if (fillStrength >= 5) protectR = 4;                   // dense hatch -> we're filling aggressively
+  if (inkRatio < 0.12 && fillStrength <= 2) protectR = 2;// pure light line drawing: less fill -> smaller halo
+  if (inkRatio > 0.5) protectR = 4;                      // heavy solid, more chance to smother small holes
   protectR = Math.max(0, Math.min(8, protectR));
-  // line-relifer 增强模型：动漫图（细线+高对比+低墨量）默认开，不只是 complex。
-  // 动漫线稿的锐利度本身就是质量核心，不管复杂度都需要。
-  // ===== 智能方案选择：根据图像特征自动选最优模型+填充+暗区还原组合 =====
-  // 分类规则（按优先级）：
-  //   1. 简单图形/Logo：edgeRatio<0.08 且 contentRatio<0.3 → XDoG + scan（AI 模型会过度处理几何图形）
-  //   2. 动漫彩图：inkRatio 0.12~0.4 且 contrast>80 → AI+增强 + quads + 暗区还原
-  //   3. 动漫线稿：inkRatio<0.12 且 contrast>100 且 meanLum>200 → AI+增强 + quads + 暗区还原
-  //   4. 写实照片：inkRatio>0.4 或 contrast<60 → AI(不增强) + scan（照片不需要锐利增强，排线保层次）
-  //   5. 其他/不确定：AI+增强 + quads（动漫是主打场景，默认向动漫倾斜）
-  let planModel, planFill, planDark, planReason;
-  if (edgeRatio < 0.08 && contentRatio < 0.30) {
-    planModel = 'xdog'; planFill = 'scan'; planDark = false;
-    planReason = '简单图形/Logo → XDoG + 扫描线（AI 模型会过度处理几何线条）';
-  } else if (inkRatio > 0.40 || contrast < 55) {
-    planModel = 'line-drawings'; planFill = 'scan'; planDark = false;
-    planReason = '写实照片/低对比 → AI 基础模型 + 扫描线排线（保明暗层次）';
-  } else if (animeLike || (inkRatio < 0.40 && contrast > 80)) {
-    planModel = 'line-drawings_enh'; planFill = 'quads'; planDark = true;
-    planReason = '动漫图 → AI 增强模型 + drawQuads 实心 + 暗区还原';
-  } else {
-    planModel = 'line-drawings_enh'; planFill = 'quads'; planDark = true;
-    planReason = '默认动漫方案 → AI 增强 + drawQuads + 暗区还原';
-  }
   return {
     gridW, dpEps, thrOff, bridge, minLen, fillStrength, fillMin, bgTol, deburr, deArea, protectR,
-    enh: complex || animeLike,
-    plan: { model: planModel, fillMode: planFill, darkRestore: planDark, reason: planReason },
-    diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag), edgeRatio: +edgeRatio.toFixed(3), complex, animeLike }
+    enh: complex,
+    diagnostics: { contentRatio, inkRatio, meanLum, darkest, lightest, contrast, bgLum, bgSat, srcDiag: Math.round(srcDiag), edgeRatio: +edgeRatio.toFixed(3), complex }
   };
 }
 function updateAutoTags(tags) {
@@ -2522,7 +2485,7 @@ function convert(o) {
   //   防止 bilinear 引入灰阶伪细节 → 泛洪误判 → 填充段爆炸（历史教训：3色块→40320段 2.7MB）
   // · 大图：高质量平滑缩小到 ≤ gridW ≤ 1600
   // GW 真正的硬上限 = workW（L1413 会 clamp min(gridW, cw)=workW）。
-  const targetW = Math.min(o.gridW, 2000);
+  const targetW = Math.min(o.gridW, 1600);
   const workW = Math.max(cw0, targetW);   // 允许放大；不允许小于源图
   const sc = workW / cw0;
   const cw = workW, chh = Math.max(1, Math.round(ch0 * sc));
@@ -2577,6 +2540,9 @@ function convert(o) {
     }
   }
 
+  // 保存原始 minLum，供 studioAutoTrace 绕开 bg removal 直接做二值化
+  // AI 线稿是白底黑线——bg removal 的 flood fill 会把细线间的"背景"吞掉
+  const rawMinLum = minLum.slice();
   const { bg, bgCount } = removeBackground(lum, mm, red, mr, mg, mb, GW, GH, o);
   window.__ph.push(['downsample+bg', Math.round(performance.now() - t0)]); console.log('[PH]', 'downsample+bg', window.__ph[window.__ph.length - 1][1]);
   const content = new Uint8Array(N);
@@ -2623,7 +2589,7 @@ function convert(o) {
   const applyFill = (srcM, srcLumGrid) => {
     console.log('[PH]', 'applyFill enter', Math.round(performance.now() - t0));
     if (!o.fillOn || o.fillStrength < 1 || capped || !srcM) return;
-    const sf = buildGradFill(srcM, srcLumGrid, GW, GH, { fillMin: o.fillMin, strength: o.fillStrength, keepHoles: true, protectR: Math.max(0, Math.min(8, Math.round(o.protectR || 0))), solidQuads: o.fillMode === 'quads' });
+    const sf = buildGradFill(srcM, srcLumGrid, GW, GH, { fillMin: o.fillMin, strength: o.fillStrength, keepHoles: true, protectR: Math.max(0, Math.min(8, Math.round(o.protectR || 0))), solidQuads: o.fillMode === 'quads', protectMask: eyeMask });
     console.log('[PH]', 'buildGradFill done', Math.round(performance.now() - t0), 'blobs', sf.blobs, 'solidCells', sf.solidMask ? sf.solidMask.reduce(function(a, b) { return a + b; }, 0) : 0);
     fillBlobs = sf.blobs; fillHoles = sf.holes; fillUsedStrength = o.fillStrength;
     // ---- 实心四边形路径：实心分量（rowStep==1 纯黑块 ∪ 原图暗区还原掩码）→ 三角剖分 → drawQuads ----
@@ -2725,7 +2691,7 @@ function convert(o) {
       const wx0 = o.x0 + ax / GW * o.w, wy0 = o.y0 * Y_BLK_SCALE + (ay / GH) * artH;
       const wx1 = o.x0 + bx / GW * o.w, wy1 = o.y0 * Y_BLK_SCALE + (by / GH) * artH;
       if (Math.abs(wx0 - wx1) < 1e-9 && Math.abs(wy0 - wy1) < 1e-9) continue;
-      const segStr = '  line {line:p4=' + F(wx0 + WT_X_OFFSET) + ',' + F(wy0 - WT_Y_CENTER) + ',' + F(wx1 + WT_X_OFFSET) + ',' + F(wy1 - WT_Y_CENTER) + '; move:b=false;}\n';
+      const segStr = '  line {line:p4=' + F(wx0 + WT_X_OFFSET) + ',' + F(wy0 - WT_Y_CENTER) + ',' + F(wx1 + WT_X_OFFSET) + ',' + F(wy1 - WT_Y_CENTER) + '; move:b=true;}\n';
       pushSeg(ay, segStr);
       polylines.push({ p: [[ax, ay], [bx, by]], closed: false, fill: true });
       fillRuns++;
@@ -2741,7 +2707,7 @@ function convert(o) {
       const ax = o.x0 + a[0] / GW * o.w, ay = o.y0 * Y_BLK_SCALE + (a[1] / GH) * artH;
       const bx = o.x0 + b[0] / GW * o.w, by = o.y0 * Y_BLK_SCALE + (b[1] / GH) * artH;
       if (Math.abs(ax - bx) < 1e-9 && Math.abs(ay - by) < 1e-9) continue;
-      const segStr = '  line {line:p4=' + F(ax + WT_X_OFFSET) + ',' + F(ay - WT_Y_CENTER) + ',' + F(bx + WT_X_OFFSET) + ',' + F(by - WT_Y_CENTER) + '; move:b=false;}\n';
+      const segStr = '  line {line:p4=' + F(ax + WT_X_OFFSET) + ',' + F(ay - WT_Y_CENTER) + ',' + F(bx + WT_X_OFFSET) + ',' + F(by - WT_Y_CENTER) + '; move:b=true;}\n';
       const ayGrid = (a[1] + b[1]) / 2;   // 用两顶点平均 grid-Y 参与整段排序
       pushSeg(ayGrid, segStr);
     }
@@ -2752,79 +2718,92 @@ function convert(o) {
   };
 
   // ---- centerline mode (only mode now) ----
-  // 阈值策略：复杂图用百分位阈值替代 Otsu——Otsu 对细线多的动漫图阈值偏高（双峰假设不成立），
-  // 用 content 区域内 minLum 的 P% 分位能稳定捕捉极细发丝。
-  let T;
-  if (o.complex) {
-    // 复杂图：取 content 区域内 minLum 的 10% 分位 + thrOff 偏移
-    const pcts = [];
-    for (let k = 0; k < N; k++) if (content[k]) pcts.push(minLum[k]);
-    pcts.sort((a, b) => a - b);
-    const pct10 = pcts.length ? pcts[Math.min(pcts.length - 1, Math.round(pcts.length * 0.18))] : 120;
-    T = Math.max(30, Math.min(220, pct10 + o.thrOff));
-  } else {
-    T = Math.max(30, Math.min(220, otsu(minLum, content, N) + o.thrOff));
-  }
+  const T = Math.max(30, Math.min(220, otsu(minLum, content, N) + o.thrOff));
   const inkRaw = new Uint8Array(N);
   for (let k = 0; k < N; k++) inkRaw[k] = (content[k] && minLum[k] < T) ? 1 : 0;
-  // ===== 原图边缘补充通道：捕捉 AI 线稿漏掉的极细发丝 =====
-  // AI 模型对 1-2px 发丝识别有限，但原图上这些发丝是真实存在的边缘。
-  // 对 srcOriginal 做 Sobel，content 区域内边缘强度够高的格子 OR 进 inkRaw。
-  if (o.srcOriginal && o.complex) {
+  // Deburr: remove speckle + prune endpoint hair BEFORE bridge-dilate so we don't inflate jaggies.
+  const dBurrPasses = Math.max(0, Math.min(5, Math.round(o.deburr || 0)));
+  const dArea = Math.max(0, Math.min(1000, Math.round(o.deArea || 0)));
+  const ink = (dBurrPasses > 0 || dArea > 0) ? deburrMask(inkRaw, GW, GH, dBurrPasses, dArea) : inkRaw;
+  // ===== 预检测眼白：在桥接膨胀之前用原始 ink 识别眼白封闭白区 =====
+  // 桥接膨胀 dilate8(ink, br) 会把眼球轮廓向内膨胀 1-2 格，直接覆盖掉眼白（眼睛在网格上只有 5-10 格宽）。
+  // 所以必须先检测眼白位置，膨胀后立刻恢复。
+  let eyeMaskPreDetect = null;
+  if (o.srcOriginal) {
     try {
-      const ec = document.createElement('canvas'); ec.width = GW; ec.height = GH;
-      const eg = ec.getContext('2d', { willReadFrequently: true });
-      eg.imageSmoothingEnabled = true; eg.imageSmoothingQuality = 'high';
-      eg.drawImage(o.srcOriginal,
+      eyeMaskPreDetect = new Uint8Array(N);
+      // 用原始 ink 做 flood fill 找封闭白区
+      const reachPre = new Uint8Array(N); const stkPre = [];
+      const pushPre = k => { if (!ink[k] && !reachPre[k]) { reachPre[k] = 1; stkPre.push(k); } };
+      for (let i = 0; i < GW; i++) { pushPre(i); pushPre(Idx(i, GH - 1, GW)); }
+      for (let j = 0; j < GH; j++) { pushPre(Idx(0, j, GW)); pushPre(Idx(GW - 1, j, GW)); }
+      while (stkPre.length) {
+        const k = stkPre.pop(), ki = k % GW, kj = (k / GW) | 0;
+        for (const [di, dj] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+          const ni = ki + di, nj = kj + dj;
+          if (ni < 0 || ni >= GW || nj < 0 || nj >= GH) continue;
+          pushPre(Idx(ni, nj, GW));
+        }
+      }
+      // 提取原图亮度（与 darkRegion 块相同的缩放方式）
+      const ocPre = document.createElement('canvas'); ocPre.width = GW; ocPre.height = GH;
+      const ogPre = ocPre.getContext('2d', { willReadFrequently: true });
+      ogPre.imageSmoothingEnabled = true; ogPre.imageSmoothingQuality = 'high';
+      ogPre.drawImage(o.srcOriginal,
         o.cL * o.srcOriginal.width, o.cT * o.srcOriginal.height,
         Math.max(1, Math.round(o.srcOriginal.width * (o.cR - o.cL))),
         Math.max(1, Math.round(o.srcOriginal.height * (o.cB - o.cT))),
         0, 0, GW, GH);
-      const eData = eg.getImageData(0, 0, GW, GH).data;
-      const edge = new Uint8Array(N);
-      // Sobel 梯度
-      for (let j = 1; j < GH - 1; j++) {
-        for (let i = 1; i < GW - 1; i++) {
-          const idx = (j * GW + i) * 4;
-          // 3×3 Sobel（用灰度）
-          const g00 = eData[((j - 1) * GW + i - 1) * 4];
-          const g02 = eData[((j - 1) * GW + i + 1) * 4];
-          const g10 = eData[(j * GW + i - 1) * 4];
-          const g12 = eData[(j * GW + i + 1) * 4];
-          const g20 = eData[((j + 1) * GW + i - 1) * 4];
-          const g22 = eData[((j + 1) * GW + i + 1) * 4];
-          const gx = -g00 + g02 - 2 * g10 + 2 * g12 - g20 + g22;
-          const gy = -g00 - 2 * g10 - g20 + g02 + 2 * g12 + g22;
-          const mag = Math.sqrt(gx * gx + gy * gy);
-          const k = j * GW + i;
-          if (content[k] && mag > 42) edge[k] = 1;   // 阈值 42：只让清晰边缘进，避免大片灰阶变墨
+      const odPre = ogPre.getImageData(0, 0, GW, GH).data;
+      const origLumPre = new Float64Array(N);
+      for (let k = 0; k < N; k++) { const p = k * 4; origLumPre[k] = 0.299 * odPre[p] + 0.587 * odPre[p + 1] + 0.114 * odPre[p + 2]; }
+      // 识别封闭白区
+      const prId = new Int32Array(N).fill(-1);
+      const prRegs = [];
+      for (let k0 = 0; k0 < N; k0++) {
+        if (ink[k0] || reachPre[k0] || prId[k0] >= 0) continue;
+        const id = prRegs.length; const cells = [k0]; prId[k0] = id;
+        const st2 = [k0];
+        while (st2.length) {
+          const k = st2.pop(), ki = k % GW, kj = (k / GW) | 0;
+          const tryN = nk => { if (!ink[nk] && !reachPre[nk] && prId[nk] < 0) { prId[nk] = id; cells.push(nk); st2.push(nk); } };
+          if (ki > 0) tryN(k - 1); if (ki < GW - 1) tryN(k + 1);
+          if (kj > 0) tryN(k - GW); if (kj < GH - 1) tryN(k + GW);
+        }
+        prRegs.push(cells);
+      }
+      const MIN_EYE_CELLS = Math.max(20, Math.round(N * 0.000015));   // 至少 20 格，排除噪点
+      const MAX_EYE_CELLS = Math.max(200, Math.round(N * 0.0008));     // 上限 0.08%，排除大面积白色背景/衣服
+      for (const cells of prRegs) {
+        if (cells.length < MIN_EYE_CELLS || cells.length > MAX_EYE_CELLS) continue;
+        // 眼白判定：封闭区域内原图亮度均值很高 + 形状接近圆/椭圆 + 有足够纯白像素
+        let s = 0, brightP = 0;
+        let minX = GW, maxX = 0, minY = GH, maxY = 0;
+        for (const k of cells) {
+          const l = origLumPre[k]; s += l; if (l > 220) brightP++;
+          const x = k % GW, y = (k / GW) | 0;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+        const meanLum = s / cells.length;
+        const brightRatio = brightP / cells.length;
+        const bw = maxX - minX + 1, bh = maxY - minY + 1;
+        const ratio = bw > 0 && bh > 0 ? Math.max(bw, bh) / Math.min(bw, bh) : 99;
+        // 眼白：亮 + 不太狭长 + 有足够纯白像素
+        if (meanLum > 215 && brightRatio > 0.4 && ratio < 3.0) {
+          for (const k of cells) eyeMaskPreDetect[k] = 1;
         }
       }
-      // 细线膨胀 1 格（Sobel 边缘可能只有 1px 宽，dilation 让它和 AI 线稿同宽）
-      const edgeD = new Uint8Array(N);
-      for (let j = 0; j < GH; j++) {
-        for (let i = 0; i < GW; i++) {
-          if (!edge[j * GW + i]) continue;
-          for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-            const ni = i + di, nj = j + dj;
-            if (ni >= 0 && ni < GW && nj >= 0 && nj < GH) edgeD[nj * GW + ni] = 1;
-          }
-        }
-      }
-      let added = 0;
-      for (let k = 0; k < N; k++) if (edgeD[k] && !inkRaw[k]) { inkRaw[k] = 1; added++; }
-      console.log('[PH]', 'edgeSupplement', 'added', added, 'cells from', o.srcOriginal.width + 'x' + o.srcOriginal.height);
-    } catch (e) { console.warn('[PH] edgeSupplement failed', e); }
+      let eyeCnt = 0; for (let k = 0; k < N; k++) if (eyeMaskPreDetect[k]) eyeCnt++;
+      if (eyeCnt) console.log('[PH]', 'eyeMask-pre', 'cells', eyeCnt, 'regions', (() => { let n=0; for (let k=0;k<N;k++) if (eyeMaskPreDetect[k] && (k%GW===0||!eyeMaskPreDetect[k-1])) n++; return n; })());
+    } catch (e) { eyeMaskPreDetect = null; console.warn('[PH] eyeMask-pre failed', e); }
   }
-  // Deburr：复杂图减到 0-1 轮，别把发丝当噪点删了
-  const dBurrPasses = Math.max(0, Math.min(5, Math.round(o.deburr || 0)));
-  const dArea = Math.max(0, Math.min(1000, Math.round(o.deArea || 0)));
-  const dBurrEff = o.complex ? Math.min(dBurrPasses, 1) : dBurrPasses;
-  const dAreaEff = o.complex ? Math.min(dArea, 30) : dArea;
-  const ink = (dBurrEff > 0 || dAreaEff > 0) ? deburrMask(inkRaw, GW, GH, dBurrEff, dAreaEff) : inkRaw;
   const br = Math.max(0, Math.min(3, Math.round(o.bridge)));
   const inkD = br > 0 ? dilate8(ink, GW, GH, br) : ink;
-  o._deburrStats = { passes: dBurrPasses, minArea: dArea, inkBefore: inkSum(inkRaw), inkAfter: inkSum(ink) };
+  // 桥接膨胀后，把预检测到的眼白格子恢复为非墨（膨胀时这些格子被墨线覆盖了）
+  if (eyeMaskPreDetect) for (let k = 0; k < N; k++) if (eyeMaskPreDetect[k]) inkD[k] = 0;
+  o._inkMask = inkD; // 暴露膨胀后的墨水掩码给描边/轮廓模式用
+  o._deburrStats = { passes: dBurrPasses, minArea: dArea, inkBefore: inkSum(inkRaw), inkAfter: inkSum(inkD) };
 
   // lumGrid-for-fill: per cell brightness post-bg-removal, used to modulate fill density.
   // Reuse lum but clamp, with ink mask -> fill mask. For non-ink we don't care since buildGradFill masks anyway.
@@ -2923,11 +2902,30 @@ function convert(o) {
   let st = stitchEnds(pre, GW, GH, 6, band);
   if (st.n > 0) { const st2 = stitchEnds(st.m, GW, GH, 6, band); st = { m: st2.m, n: st.n + st2.n }; }
   const sk = st.m;
-  const paths = mergeChains(skeletonPaths(sk, GW, GH), GW).filter(p => p.length >= o.minLen);
+  const allMerged = mergeChains(skeletonPaths(sk, GW, GH), GW);
+  // === 给 studioAutoTrace 用的精细路径：完全独立管线 ===
+  // 绕开 bg removal（flood fill 会吞细线间的区域）、deburr、dilate
+  // 只用 rawMinLum（未被 bg removal 篡改）做二值化 + 骨架化
+  const Traw = Math.max(30, Math.min(230, otsu(rawMinLum, new Uint8Array(N).fill(1), N)));
+  const inkTrace = new Uint8Array(N);
+  for (let k = 0; k < N; k++) inkTrace[k] = rawMinLum[k] < Traw ? 1 : 0;
+  const skTrace = zhangSuen(inkTrace, GW, GH);
+  const t1Trace = thinTo1px(skTrace, GW, GH);
+  const allRaw = mergeChains(skeletonPaths(t1Trace, GW, GH), GW);
+  const smoothTrace = [];
+  for (const path of allRaw) {
+    if (path.length < 2) continue;
+    const pts = path.map(k => [k % GW, (k / GW) | 0]);
+    const s = chaikinOpen(pts, 2); // 2 次迭代：比 1 次平滑得多，放大后不锯齿
+    if (s.length >= 2) smoothTrace.push(s);
+  }
+  o._rawPaths = smoothTrace;
+  // === .blk 路径（正常过滤+简化） ===
+  const paths = allMerged.filter(p => p.length >= o.minLen);
   const smooth = [];
   for (const path of paths) {
     const pts = path.map(k => [k % GW, (k / GW) | 0]);
-    const s = dpOpen(chaikinOpen(pts, 2), o.dpEps);
+    const s = dpOpen(chaikinOpen(pts, 1), o.dpEps);
     if (s.length >= 2) smooth.push(s);
   }
   const weldedN = weldChains(smooth, 2.5);
@@ -2948,7 +2946,10 @@ function convert(o) {
   // → rowStep=1 → 走 drawQuads 实心或满行扫描线，动漫的"黑发黑瞳"才立得起来。
   // 封闭性泄漏只会导致漏检（区域连通到背景），不会误检，安全。
   let darkRegions = 0, darkRegionCells = 0, fillSrcM = inkD, fillLumG = fillLum;
-  if (o.srcOriginal && o.fillOn && o.fillStrength >= 1 && o.planDarkRestore !== false) {
+  let eyeMask = null;   // 合并后的完整眼区（preDetect + darkRegion），用于 stats + buildGradFill protectMask
+  let eyeMaskDarkRegion = null;   // darkRegion 识别的准确眼区（瞳孔+眼白双重验证），用于 eyePathSet
+  let eyeRegions = 0;   // 眼区计数（外层声明，stats 可访问）
+  if (o.srcOriginal && o.fillOn && o.fillStrength >= 1) {
     try {
       const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
       const og2 = oc.getContext('2d', { willReadFrequently: true });
@@ -2969,8 +2970,6 @@ function convert(o) {
         bgSum += origLum[Idx(i, j, GW)]; bgN++;
       }
       const DARK_THR = Math.max(60, Math.min(140, (bgN ? bgSum / bgN : 255) * 0.42));
-      const DARK_THR_OPEN = Math.max(90, Math.min(160, (bgN ? bgSum / bgN : 255) * 0.50));  // 开放暗区阈值更严（原 0.58 太松，头发全填黑）
-      // ===== 路径 A：封闭白区检测（精确，处理眼睛/瞳孔等小区域）=====
       // 泛洪：从网格边界走所有白格（非墨）；走不到的白格 = 被墨线封闭的区域
       // 用 8 连接（含对角）让泄漏路径更难绕走，再加 1 次 4 连接膨胀容忍 1px 间隙——
       // AI 线稿眼部轮廓常有 1px 断线，4 连接会让泄漏路径进来把眼睛吞并，8+膨胀后真正封闭的眼睛区域才留下
@@ -2989,6 +2988,8 @@ function convert(o) {
         }
       }
       // 1 次膨胀：reach 边界附近 1px 内的白格也"视为可达"，消除间隙泄漏
+      // 但跳过亮度 > 180 的亮格（眼白/高光），不让泄漏路径通过眼白把头发等大暗区锁闭失败
+      // 同时也保护眼白：膨胀到亮格就停 → 眼白不被 reach 覆盖 → 在 regs 里 → 后续保护
       const dilatedReach = new Uint8Array(reach);
       for (let k = 0; k < N; k++) {
         if (!reach[k]) continue;
@@ -2997,7 +2998,7 @@ function convert(o) {
           const ni = ki + di, nj = kj + dj;
           if (ni < 0 || ni >= GW || nj < 0 || nj >= GH) continue;
           const nk = Idx(ni, nj, GW);
-          if (!inkD[nk]) dilatedReach[nk] = 1;
+          if (!inkD[nk] && origLum[nk] <= 180) dilatedReach[nk] = 1;  // 亮格不参与膨胀！
         }
       }
       // 用膨胀后的 reach 识别封闭白区
@@ -3019,90 +3020,110 @@ function convert(o) {
       }
       const MIN_DARK_CELLS = Math.max(12, Math.round(N * 0.00004));   // 太小=噪点/灰阶碎屑
       const holeMask = new Uint8Array(N);
+      eyeMask = new Uint8Array(N);   // 合并后的完整眼区（瞳孔+眼白，用于 stats）
+      eyeMaskDarkRegion = new Uint8Array(N);   // darkRegion 识别的准确眼区（瞳孔+眼白双重验证，用于路径保护）
+      // 先合并预检测的眼白位置（桥接膨胀前用原始 ink 检测的，更准确）
+      if (eyeMaskPreDetect) for (let k = 0; k < N; k++) if (eyeMaskPreDetect[k]) eyeMask[k] = 1;
       for (const cells of regs) {
         if (cells.length < MIN_DARK_CELLS) continue;
-        let s = 0; for (const k of cells) s += origLum[k];
-        if (s / cells.length > DARK_THR) continue;
+        // 眼区识别：封闭区域内同时有极亮（眼白/高光）和极暗（瞳孔）像素 → 大概率是眼睛，不填实心
+        // 放宽阈值：minL<100 + maxL>160 比原 80/180 更宽容，覆盖中间调眼睛
+        let minL = 255, maxL = 0, s = 0;
+        for (const k of cells) {
+          const l = origLum[k];
+          if (l < minL) minL = l;
+          if (l > maxL) maxL = l;
+          s += l;
+        }
+        const meanLum = s / cells.length;
+        if (meanLum > DARK_THR) continue;
+        // 眼区判定 A：同区域内极暗 + 极亮并存（典型瞳孔+眼白）
+        // 眼区判定 B：小区域 + 有暗点（瞳孔）+ 有较亮点（眼白/头发高光区分度）
+        // 必须有 maxL > 100：纯头发暗区整体偏暗（maxL≈80-100），瞳孔嵌头发时周围亮边 > 100
+        const isEyeA = (minL < 100 && maxL > 160);
+        const isEyeB = (cells.length < N * 0.0015 && minL < 80 && maxL > 100);
+        if (isEyeA || isEyeB) {
+          eyeRegions++;
+          for (const k of cells) { eyeMask[k] = 1; eyeMaskDarkRegion[k] = 1; }
+          continue;   // 不填实心
+        }
         for (const k of cells) holeMask[k] = 1;
         darkRegions++; darkRegionCells += cells.length;
       }
-      // ===== 路径 B：开放暗区检测（不依赖封闭性，还原头发阴影/衣服褶皱等大面积暗部）=====
-      // 动漫图大部分暗部在 AI 线稿里是开放排线区，路径 A 检测不到。这里直接对 content
-      // （去背景）内、原图亮度 < DARK_THR_OPEN 的格子做连通域，面积在合理范围的标记为暗区。
-      // content 掩码保证不填背景；面积上限防止整个人物被填成大黑块。
-      let openDarkRegions = 0, openDarkCells = 0;
-      const openRegId = new Int32Array(N).fill(-1);
-      const openRegs = [];
-      for (let k0 = 0; k0 < N; k0++) {
-        if (!content[k0] || origLum[k0] >= DARK_THR_OPEN || openRegId[k0] >= 0) continue;
-        if (holeMask[k0]) { openRegId[k0] = -2; continue; }   // 已被路径 A 标记，跳过
-        const id = openRegs.length; const cells = [k0]; openRegId[k0] = id;
-        const st3 = [k0];
-        while (st3.length) {
-          const k = st3.pop(), ki = k % GW, kj = (k / GW) | 0;
-          const tryN = nk => {
-            if (nk < 0 || nk >= N) return;
-            if (!content[nk] || origLum[nk] >= DARK_THR_OPEN || openRegId[nk] >= 0 || holeMask[nk]) return;
-            openRegId[nk] = id; cells.push(nk); st3.push(nk);
-          };
-          if (ki > 0) tryN(k - 1);
-          if (ki < GW - 1) tryN(k + 1);
-          if (kj > 0) tryN(k - GW);
-          if (kj < GH - 1) tryN(k + GW);
-        }
-        openRegs.push(cells);
-      }
-      const OPEN_MIN = Math.max(20, Math.round(N * 0.0002));    // 太小=噪点
-      const OPEN_MAX = Math.round(N * 0.06);                    // 太大=头发主体，不填（原 0.10 太松）
-      for (const cells of openRegs) {
-        if (cells.length < OPEN_MIN || cells.length > OPEN_MAX) continue;
-        // 二次校验：平均亮度要真的够暗（防止 content 内亮区误入）
-        let s = 0; for (const k of cells) s += origLum[k];
-        if (s / cells.length > DARK_THR_OPEN * 0.85) continue;
-        for (const k of cells) holeMask[k] = 1;
-        openDarkRegions++; openDarkCells += cells.length;
-      }
-      darkRegions += openDarkRegions; darkRegionCells += openDarkCells;
       if (darkRegions) {
         fillSrcM = new Uint8Array(inkD);
         fillLumG = Float64Array.from(fillLum);
         for (let k = 0; k < N; k++) if (holeMask[k]) { fillSrcM[k] = 1; fillLumG[k] = origLum[k]; }
         o._darkMask = holeMask;   // quads 剖分来源直并暗区格子（不依赖 rowStep 亮度判定）
       }
-      console.log('[PH]', 'darkRegion', 'thr', Math.round(DARK_THR), '/ openThr', Math.round(DARK_THR_OPEN),
-        'closed', darkRegions - openDarkRegions, 'open', openDarkRegions, 'cells', darkRegionCells);
+      console.log('[PH]', 'darkRegion', 'thr', Math.round(DARK_THR), 'regions', darkRegions, 'cells', darkRegionCells, 'eyes_protected', eyeRegions);
     } catch (e) { console.warn('[PH] darkRegion failed', e); }
   }
+  // 兜底：如果 darkRegion 块没执行（fillOn/strength 条件不满足），但预检测了眼白，用预检测结果
+  if (!eyeMask && eyeMaskPreDetect) eyeMask = eyeMaskPreDetect;
+  if (!eyeMaskDarkRegion) eyeMaskDarkRegion = eyeMask;   // darkRegion 未执行时退化为合并结果
   applyFill(fillSrcM, fillLumG);
   window.__ph.push(['applyFill', Math.round(performance.now() - t0)]); console.log('[PH]', 'applyFill', window.__ph[window.__ph.length - 1][1], 'quads', JSON.stringify(o._quadInfo));
-  // ===== 全局体积预算：逐级升筛阈值，最后才放大 eps，最大限度保曲线角点 =====
-  // Pass 0 原始；Pass 1 过滤 ≤2 顶点（1 线段噪点）；Pass 2 过滤 ≤3 顶点（单折角短笔画）；
-  // Pass 3+ 才温和放大 eps ×1.18/轮。这样高 gridW 下也尽量靠"丢噪点"而非"砍角点"省字节。
-  const fillSegs = segs.splice(detailSegN0);
-  const BLK_OVERHEAD_EST = 5200;   // crosshair_distances + 头尾杂项 + quad 块开销（原 3500 偏乐观导致实际超限）
-  let budgetPasses = 0, detailCur = smooth, budgetEps = o.dpEps;
-  const SHORT_FILTERS = [2, 3];   // 顶点数阈值递增
-  let shortIdx = 0;
+  // ===== 全局体积预算：先筛短路径（≤2/≤3 顶点的噪点笔画），再温和放大 eps =====
+  // 旧方案 ×1.45/轮 4 轮会把 eps 推到 6+，眼睛/发丝等细节全被简化掉。
+  // 新方案：Pass 1-2 过滤极短路径（无损，只删噪点），Pass 3+ 才温和放大 eps（×1.18/轮），
+  // 且 eps 上限 = 初始 ×2.5，避免过度简化。
+  // 眼区保护：路径 bbox 与 eyeMask 重叠 → 永不删除、永不放大 eps（眼睛小圆圈经放大 eps 会塌成三角/直线）
+  const fillSegs = segs.splice(detailSegN0);   // 摘出填充段，segs 只剩细节段
+  const BLK_OVERHEAD_EST = 3500;               // crosshair_distances + 头尾杂项的保守估计
+  // --- 识别眼区路径：路径任一顶点周围 R 格内有 eyeMaskDarkRegion 标记 → 视为眼区线条 ---
+  // 只用 darkRegion 的准确眼区（瞳孔+眼白双重验证），不用 preDetect（有大量头发缝误检）
+  const eyePathSet = new Set();
+  if (eyeMaskDarkRegion) {
+    const R = 3;   // 容忍 3 格偏离（线条可能贴着眼区边缘走）
+    for (let i = 0; i < smooth.length; i++) {
+      const s = smooth[i];
+      let near = false;
+      for (let j = 0; j < s.length && !near; j++) {
+        const x = s[j][0] | 0, y = s[j][1] | 0;
+        for (let dy = -R; dy <= R && !near; dy++) {
+          for (let dx = -R; dx <= R && !near; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= GW || ny < 0 || ny >= GH) continue;
+            if (eyeMaskDarkRegion[Idx(nx, ny, GW)]) near = true;
+          }
+        }
+      }
+      if (near) eyePathSet.add(i);
+    }
+  }
+  // detailCur 改为对象数组 {p, eye}，保留眼区标记贯穿整个预算循环
+  let detailCur = smooth.map((p, i) => ({ p, eye: eyePathSet.has(i) }));
+  let budgetPasses = 0, budgetEps = o.dpEps;
+  const EPS_CAP = o.dpEps * 2.5;  // eps 上限：不超过初始的 2.5 倍
+  let eyeProtectedN = 0;
   for (;;) {
     segs.length = 0;
-    for (const s of detailCur) emitPolyline(s, false, false);
+    for (const it of detailCur) emitPolyline(it.p, false, false);
     for (const fs of fillSegs) segs.push(fs);
     let bytes = BLK_OVERHEAD_EST + (o.quads ? o.quads.length : 0);
     for (const s of segs) bytes += s[1].length;
     if (bytes <= BLK_SIZE_LIMIT || budgetPasses >= 5 || !detailCur.length) break;
     budgetPasses++;
-    // 先两轮递增过滤极短路径，再放大 eps
-    if (shortIdx < SHORT_FILTERS.length) {
-      const thr = SHORT_FILTERS[shortIdx++];
-      detailCur = smooth.filter(s => s.length > thr);
-      budgetEps = o.dpEps;
+    if (budgetPasses <= 2) {
+      // Pass 1-2：筛短路径（≤2 顶点 / ≤3 顶点），不放大 eps
+      // 眼区路径例外：无论多短都保留（眼睛圆圈经 dpOpen 后顶点可能就 3-4 个）
+      const minVerts = budgetPasses === 1 ? 2 : 3;
+      detailCur = detailCur.filter(it => it.eye || it.p.length > minVerts);
     } else {
-      budgetEps = o.dpEps * Math.pow(1.22, budgetPasses - SHORT_FILTERS.length);
+      // Pass 3+：温和放大 eps（×1.18/轮），但不超过 EPS_CAP
+      // 眼区路径例外：永远用原 o.dpEps（眼睛经放大 eps 会塌成三角/直线）
+      budgetEps = Math.min(EPS_CAP, o.dpEps * Math.pow(1.18, budgetPasses - 2));
       detailCur = [];
-      for (const s of smooth) { const r = dpOpen(s, budgetEps); if (r.length >= 2) detailCur.push(r); }
+      for (let i = 0; i < smooth.length; i++) {
+        const eps = eyePathSet.has(i) ? o.dpEps : budgetEps;
+        const r = dpOpen(smooth[i], eps);
+        if (r.length >= 2) detailCur.push({ p: r, eye: eyePathSet.has(i) });
+      }
+      eyeProtectedN = eyePathSet.size;
     }
   }
-  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2), 'shortFilter', SHORT_FILTERS.slice(0, shortIdx).join(','));
+  if (budgetPasses) console.log('[PH]', 'sizeBudget', budgetPasses, 'passes, eps', o.dpEps.toFixed(2), '→', budgetEps.toFixed(2), 'eyePaths', eyePathSet.size, 'protected', eyeProtectedN);
   flushSegs();
   window.__ph.push(['flush', Math.round(performance.now() - t0)]); console.log('[PH]', 'flush', window.__ph[window.__ph.length - 1][1], 'segs', segCount);
   const quadInfo = o._quadInfo || { quads: 0, bytes: 0, blobs: 0, fail: 0, skip: 0, active: false };
@@ -3116,6 +3137,8 @@ function convert(o) {
   }
   if (fillRuns > 0) o.stats += ' · 填块 ' + fillBlobs + '(' + fillHoles + '洞) · 强度 ' + fillUsedStrength + ' · 扫描线 ' + fillRuns;
   if (darkRegions) o.stats += ' · 原图暗区 ' + darkRegions + ' 块(' + Math.round(darkRegionCells / N * 100) + '%)';
+  if (eyeRegions) o.stats += ' · 护眼 ' + eyeRegions + ' 块';
+  if (eyePathSet && eyePathSet.size) o.stats += ' · 眼区路径 ' + eyePathSet.size + ' 条(不简化)';
   if (quadInfo.active) o.stats += ' · 实心quads ' + quadInfo.quads + '(' + quadInfo.blobs + '块' + (quadInfo.fail ? ' · 回退' + quadInfo.fail : '') + (quadInfo.skip ? ' · 超预算跳过' + quadInfo.skip : '') + ') ' + Math.round(quadInfo.bytes / 1024) + 'KB';
   if (budgetPasses) o.stats += ' · 体积自适应 ' + budgetPasses + ' 轮(eps→' + budgetEps.toFixed(2) + ')';
   if (capped) o.stats += ' · ⚠ ' + (capReason || ('已达安全段数上限（理论最大值，几乎不会触发），降网格或关填充可释放余量'));
@@ -3132,45 +3155,85 @@ function convert(o) {
   const g = pv.getContext('2d');
   g.fillStyle = '#fff'; g.fillRect(0, 0, pw, ph);
   g.imageSmoothingEnabled = false;
-  g.strokeStyle = '#111'; g.lineJoin = 'round'; g.lineCap = 'round';
-  // 实心 quads 预览：单 path 批量填充，和游戏内渲染观感一致（实心色块）
-  if (o._quadTris && o._quadTris.length) {
-    g.fillStyle = '#111';
-    g.beginPath();
-    for (const t of o._quadTris) {
-      g.moveTo(t[0][0] / GW * pw, t[0][1] / GH * ph);
-      for (let i = 1; i < 4; i++) g.lineTo(t[i][0] / GW * pw, t[i][1] / GH * ph);
-      g.closePath();
+  const genMode = $('genMode') ? $('genMode').value : 'trace';
+  if (genMode === 'outline' && o._inkMask) {
+    // === 经典模式：扫 ink mask 逐行画水平线段 ===
+    const ink = o._inkMask;
+    const rowSkip = o._outlineSkipFactor || 1;
+    g.strokeStyle = '#111';
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.lineWidth = 0.8;
+    for (let y = 0; y < GH; y++) {
+      if (y % rowSkip !== 0) continue;
+      const rowOff = y * GW;
+      let x = 0;
+      while (x < GW) {
+        while (x < GW && !ink[rowOff + x]) x++;
+        if (x >= GW) break;
+        const x0 = x;
+        while (x < GW && ink[rowOff + x]) x++;
+        const x1 = x - 1;
+        if (x1 - x0 + 1 < 5) continue;
+        g.beginPath();
+        g.moveTo((x0 / GW) * pw, (y / GH) * ph);
+        g.lineTo((x1 / GW) * pw, (y / GH) * ph);
+        g.stroke();
+      }
     }
-    g.fill();
-  }
-  // fill 段：水平扫描线，细密细线 —— 与 WT drawLines 单条线宽对齐
-  g.lineWidth = 1.0;
-  for (const pl of polylines) {
-    if (!pl.fill) continue;
-    const s = pl.p;
-    g.beginPath();
-    for (let i = 0; i < s.length; i++) {
-      const x = (s[i][0] / GW) * pw, yy = (s[i][1] / GH) * ph;
-      if (i === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+  } else if (genMode === 'trace' && o._rawPaths?.length) {
+    // === 描边模式：画骨架化追踪路径 ===
+    const compressed = getCompressedPaths(o);
+    g.strokeStyle = '#111';
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.lineWidth = 0.8;
+    for (const cp of compressed) {
+      if (cp.pts.length < 2) continue;
+      g.beginPath();
+      for (let i = 0; i < cp.pts.length; i++) {
+        const x = (cp.pts[i][0] / GW) * pw, yy = (cp.pts[i][1] / GH) * ph;
+        if (i === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+      }
+      g.stroke();
     }
-    if (pl.closed) g.closePath();
-    g.stroke();
-  }
-  // 轮廓段：稍细但必须 ≥ 0.5px，保证可见
-  g.lineWidth = 0.6;
-  g.strokeStyle = '#222';
-  for (const pl of polylines) {
-    if (pl.fill) continue;
-    const s = pl.p;
-    if (!s || s.length < 2) continue;
-    g.beginPath();
-    for (let i = 0; i < s.length; i++) {
-      const x = (s[i][0] / GW) * pw, yy = (s[i][1] / GH) * ph;
-      if (i === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+  } else {
+    // 标准预览：quads 填充 + fill 扫描线 + 轮廓
+    g.strokeStyle = '#111'; g.lineJoin = 'round'; g.lineCap = 'round';
+    if (o._quadTris && o._quadTris.length) {
+      g.fillStyle = '#111';
+      g.beginPath();
+      for (const t of o._quadTris) {
+        g.moveTo(t[0][0] / GW * pw, t[0][1] / GH * ph);
+        for (let i = 1; i < 4; i++) g.lineTo(t[i][0] / GW * pw, t[i][1] / GH * ph);
+        g.closePath();
+      }
+      g.fill();
     }
-    if (pl.closed) g.closePath();
-    g.stroke();
+    g.lineWidth = 1.0;
+    for (const pl of polylines) {
+      if (!pl.fill) continue;
+      const s = pl.p;
+      g.beginPath();
+      for (let i = 0; i < s.length; i++) {
+        const x = (s[i][0] / GW) * pw, yy = (s[i][1] / GH) * ph;
+        if (i === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+      }
+      if (pl.closed) g.closePath();
+      g.stroke();
+    }
+    g.lineWidth = 0.6;
+    g.strokeStyle = '#222';
+    for (const pl of polylines) {
+      if (pl.fill) continue;
+      const s = pl.p;
+      if (!s || s.length < 2) continue;
+      g.beginPath();
+      for (let i = 0; i < s.length; i++) {
+        const x = (s[i][0] / GW) * pw, yy = (s[i][1] / GH) * ph;
+        if (i === 0) g.moveTo(x, yy); else g.lineTo(x, yy);
+      }
+      if (pl.closed) g.closePath();
+      g.stroke();
+    }
   }
   pvWrap.style.display = 'block';
   pv.classList.add('ratio-aware');
@@ -3232,7 +3295,10 @@ const sight = {
   bgCustom: false,     // true = user custom, false = draw built-in WT default (prefer bgDefaultImage)
   dragging: null,      // null | { mode:'move'|'resize', sx, sy, origX, origY, origW }
   // state mirrors form inputs
-  x0: 0.02, y0: 0.02, w: 0.2,
+  // w=0.35 比 GitHub 原版 0.2 大，竖版图（GH/GW≈1.84）时 artH=0.64，几乎填满准心 Y（±0.28125）
+  // y0=0 让图像顶部对准准心底部 by=-0.28125，按原始宽高比向下延伸
+  // 用户可以拖滑杆自由调整；zoomFit 按钮会自动 contain-fit 等比缩放到准心内不变形
+  x0: 0.325, y0: 0, w: 0.35,
 };
 // Expose for inspection / automation (browser tooling).
 if (typeof window !== 'undefined') { window.sight = sight; }
@@ -3256,7 +3322,9 @@ function loadDefaultReticleImage() {
 }
 
 function resetSightLayoutToDefaults() {
-  sight.x0 = 0.02; sight.y0 = 0.02; sight.w = 0.20;
+  window.__traceSketchApplied = false; // 换图后 trace 模式必须重新跑 AI 转线稿
+  window.__cachedAuto = null;          // 旧图的 auto 参数也作废
+  sight.w = 0.35; sight.x0 = (1 - sight.w) / 2; sight.y0 = 0;
   syncFormFromSight();
   redrawSight();
 }
@@ -3323,8 +3391,8 @@ function initSightCanvas() {
     const dy = (p.y - sight.dragging.sy) / vh;
     if (sight.dragging.mode === 'move') {
       const artHi = sight.h();
-      sight.x0 = Math.max(0, Math.min(1 - sight.w, sight.dragging.ox + dx));
-      sight.y0 = Math.max(0, Math.min(1 - artHi, sight.dragging.oy + dy));
+      sight.x0 = Math.max(-0.5, Math.min(1 - sight.w + 0.5, sight.dragging.ox + dx));
+      sight.y0 = Math.max(-1, Math.min(1.5, sight.dragging.oy + dy));
     } else {
       // use the bigger axis as resize input, normalized against the larger viewport axis for balanced feel
       const axisMax = Math.max(vw, vh);
@@ -3333,7 +3401,7 @@ function initSightCanvas() {
       const dMax = Math.max(Math.abs(dxN), Math.abs(dyN));
       const sign = (dxN + dyN) >= 0 ? 1 : -1;
       const delta = sign * dMax;
-      sight.w = Math.max(0.03, Math.min(0.6, sight.dragging.ow + delta * 1.8));
+      sight.w = Math.max(0.03, Math.min(1.5, sight.dragging.ow + delta * 1.8));
       // keep top-left pinned
     }
     syncFormFromSight();
@@ -3374,8 +3442,8 @@ function initSightCanvas() {
       const dx = -Math.sign(ev.deltaX) * 0.006 || 0;
       const dy = -Math.sign(ev.deltaY) * 0.006 || 0;
       const artHi = sight.h();
-      sight.x0 = Math.max(0, Math.min(1 - sight.w, sight.x0 + dx));
-      sight.y0 = Math.max(0, Math.min(1 - artHi, sight.y0 + dy));
+      sight.x0 = Math.max(-0.5, Math.min(1 - sight.w + 0.5, sight.x0 + dx));
+      sight.y0 = Math.max(-1, Math.min(1.5, sight.y0 + dy));
       syncFormFromSight();
       redrawSight();
       if (lastBlk) regenerateBlkFromLastOpts();
@@ -3404,9 +3472,9 @@ function initSightCanvas() {
   // input-form sync back to sight (in case user types values manually in advanced)
   ['x0', 'y0', 'w'].forEach(id => {
     $(id).addEventListener('change', () => {
-      sight.x0 = Math.max(0, Math.min(0.9, num('x0')));
-      sight.y0 = Math.max(0, Math.min(0.9, num('y0')));
-      sight.w = Math.max(0.03, Math.min(0.6, num('w') || 0.2));
+      sight.x0 = Math.max(-0.5, Math.min(1.5, num('x0')));
+      sight.y0 = Math.max(-1, Math.min(1.5, num('y0')));
+      sight.w = Math.max(0.03, Math.min(1.5, num('w') || 0.35));
       syncFormFromSight();
       redrawSight();
       if (lastBlk) regenerateBlkFromLastOpts();
@@ -3621,8 +3689,8 @@ function initManualEdit() {
       if (d.points.length >= 2) {
         const pts = d.points.map(p => [p.x, p.y]);
         const simplified = dpOpen(pts, 0.003);
-        // Chaikin 2 轮平滑（更顺滑曲线）
-        const smoothed = chaikinOpen(simplified, 2);
+        // Chaikin 1 轮平滑（保锐角又去抖）
+        const smoothed = chaikinOpen(simplified, 1);
         for (let i = 0; i < smoothed.length - 1; i++) {
           manualState.lines.push({ x1: smoothed[i][0], y1: smoothed[i][1], x2: smoothed[i+1][0], y2: smoothed[i+1][1] });
         }
@@ -3916,18 +3984,18 @@ function drawManualLayer(g) {
 }
 
 function artRectOnCanvas() {
-  // The user sees the reticle screenshot letterboxed inside `sight.viewport` (contain-fit).
-  // `x0 / y0 / w` are defined relative to the 16:9 SCREEN (the image rectangle,
-  // NOT the letterbox-bars area) so x0=0 = left edge of displayed screenshot pixels, etc.
-  const vp = sight.viewport || { x: 0, y: 0, w: sight.W, h: sight.H };
+  // sight.x0 / y0 / w 相对 WT 16:9 屏幕
+  // canvas 16:9 本身就是 WT 屏幕
+  // 图像 box 像素：rx = x0*W, ry = y0*H, rw = w*W, rh = rw*GH/GW（保持图像比例）
+  const W = sight.W, H = sight.H;
   const ratioHW = lastOpts ? (lastOpts.GH / lastOpts.GW)
                            : (img ? (img.naturalHeight || img.height) / (img.naturalWidth || img.width)
                                   : 1);
-  const rw = sight.w * vp.w;
+  const rw = sight.w * W;
   const rh = Math.max(1, rw * ratioHW);
   return {
-    rx: vp.x + sight.x0 * vp.w,
-    ry: vp.y + sight.y0 * vp.h,
+    rx: sight.x0 * W,
+    ry: sight.y0 * H,
     rw, rh,
   };
 }
@@ -4202,41 +4270,81 @@ function redrawSight() {
     drawUserReticleBackground(g);
   }
   // art preview (lines + fill) on top —— 与 WT useSmoothEdge=no 硬边风格对齐
-  if (lastOpts && lastOpts._polylines) {
+  if (lastOpts && (lastOpts._polylines || lastOpts._rawPaths || lastOpts._inkMask)) {
     const r = artRectOnCanvas();
     const GW = lastOpts.GW, GH = lastOpts.GH;
     g.save();
     g.imageSmoothingEnabled = false;
     g.lineJoin = 'round'; g.lineCap = 'round';
-    // fill scans first, underside —— 线宽对齐 WT drawLines 单条线实际厚度（1 grid ≈ 1 screen px 时 ≈0.8~1.0px）
-    g.strokeStyle = 'rgba(12, 12, 12, 0.96)';
-    g.lineWidth = Math.max(0.7, r.rw / GW * 0.85);
-    for (const pl of lastOpts._polylines) {
-      if (!pl.fill) continue;
-      const s = pl.p;
-      if (!s || s.length < 2) continue;
-      g.beginPath();
-      for (let i = 0; i < s.length; i++) {
-        const x = r.rx + (s[i][0] / GW) * r.rw;
-        const y = r.ry + (s[i][1] / GH) * r.rh;
-        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    const mode = $('genMode')?.value || 'trace';
+    if (mode === 'outline' && lastOpts._inkMask) {
+      // === 经典模式：扫 ink mask 逐行画水平线段 ===
+      const ink = lastOpts._inkMask;
+      const rowSkip = lastOpts._outlineSkipFactor || 1;
+      g.strokeStyle = '#111';
+      g.lineWidth = Math.max(0.7, r.rw / GW * 0.85);
+      for (let y = 0; y < GH; y++) {
+        if (y % rowSkip !== 0) continue;
+        const rowOff = y * GW;
+        let x = 0;
+        while (x < GW) {
+          while (x < GW && !ink[rowOff + x]) x++;
+          if (x >= GW) break;
+          const x0 = x;
+          while (x < GW && ink[rowOff + x]) x++;
+          const x1 = x - 1;
+          if (x1 - x0 + 1 < 2) continue; // 和 buildOutlineBlk 一致
+          g.beginPath();
+          g.moveTo(r.rx + (x0 / GW) * r.rw, r.ry + (y / GH) * r.rh);
+          g.lineTo(r.rx + (x1 / GW) * r.rw, r.ry + (y / GH) * r.rh);
+          g.stroke();
+        }
       }
-      g.stroke();
-    }
-    // outlines next, thin hard edge —— 与 koishi 风格的细线轮廓对齐
-    g.strokeStyle = '#050505';
-    g.lineWidth = Math.max(0.5, r.rw / GW * 0.8);
-    for (const pl of lastOpts._polylines) {
-      if (pl.fill) continue;
-      const s = pl.p;
-      if (!s || s.length < 2) continue;
-      g.beginPath();
-      for (let i = 0; i < s.length; i++) {
-        const x = r.rx + (s[i][0] / GW) * r.rw;
-        const y = r.ry + (s[i][1] / GH) * r.rh;
-        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    } else if (mode === 'trace' && lastOpts._rawPaths?.length) {
+      // === 描边模式：画骨架化追踪路径（和 buildTraceBlk 紧凑格式一致）===
+      const compressed = getCompressedPaths(lastOpts);
+      g.strokeStyle = '#111';
+      g.lineWidth = Math.max(0.8, r.rw / GW * 1.1);
+      for (const cp of compressed) {
+        if (cp.pts.length < 2) continue;
+        g.beginPath();
+        for (let i = 0; i < cp.pts.length; i++) {
+          const x = r.rx + (cp.pts[i][0] / GW) * r.rw;
+          const y = r.ry + (cp.pts[i][1] / GH) * r.rh;
+          if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        }
+        g.stroke();
       }
-      g.stroke();
+    } else if (lastOpts._polylines?.length) {
+      // === 兼容旧 normal 模式：_polylines 填充 + 轮廓 ===
+      g.strokeStyle = 'rgba(12, 12, 12, 0.96)';
+      g.lineWidth = Math.max(0.7, r.rw / GW * 0.85);
+      for (const pl of lastOpts._polylines) {
+        if (!pl.fill) continue;
+        const s = pl.p;
+        if (!s || s.length < 2) continue;
+        g.beginPath();
+        for (let i = 0; i < s.length; i++) {
+          const x = r.rx + (s[i][0] / GW) * r.rw;
+          const y = r.ry + (s[i][1] / GH) * r.rh;
+          if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        }
+        g.stroke();
+      }
+      g.strokeStyle = '#050505';
+      g.lineWidth = Math.max(0.5, r.rw / GW * 0.8);
+      for (const pl of lastOpts._polylines) {
+        if (pl.fill) continue;
+        const s = pl.p;
+        if (!s || s.length < 2) continue;
+        g.beginPath();
+        for (let i = 0; i < s.length; i++) {
+          const x = r.rx + (s[i][0] / GW) * r.rw;
+          const y = r.ry + (s[i][1] / GH) * r.rh;
+          if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        }
+        g.stroke();
+      }
     }
     // frame + resize handle
     g.strokeStyle = 'rgba(232, 176, 74, 0.95)';
@@ -4283,100 +4391,395 @@ function redrawSight() {
   drawManualLayer(g);
 }
 
-function regenerateBlkFromLastOpts() {
-  if (!lastOpts) return;
-  const o = Object.assign({}, lastOpts);
+// 公共：对 o._rawPaths 做路径整体裁剪（和 buildTraceBlk 完全相同的算法）
+// 返回压缩后的路径数组：[{ pts:[[gx,gy],[gx,gy]...], avgY }]
+// 同一份数据既用来画预览画布，又用来生成 .blk
+// 关键：_rawPaths 已经是 chaikin(2) 加密好的精细路径，默认不做 dpOpen！
+// 只有当原始点太多超限时才用极小 eps 压缩。
+function getCompressedPaths(o) {
+  if (!o._rawPaths || !o._rawPaths.length) return [];
+  const GW = o.GW, GH = o.GH;
+  const MIN_SEGS_TO_KEEP = 3;
+  const MAX_SEGS = 17500;
+  const paths = [];
+  const droppedCount = { noise: 0, tooShort: 0 };
+  for (const path of o._rawPaths) {
+    if (path.length < 2) { droppedCount.tooShort++; continue; }
+    const segs = path.length - 1;
+    if (segs < MIN_SEGS_TO_KEEP) { droppedCount.noise++; continue; }
+    let sumY = 0, cnt = 0;
+    for (const pt of path) { sumY += pt[1]; cnt++; }
+    paths.push({ pts: path.slice(), avgY: cnt > 0 ? sumY / cnt : 0 });
+  }
+  // Phase 1: 先尝试不做任何 DP 简化直接输出（曲线最光滑！）
+  let totalSegs = paths.reduce((s, p) => s + p.pts.length - 1, 0);
+  let bestEps = 0;
+  let result;
+  if (totalSegs <= MAX_SEGS) {
+    result = paths.map(p => ({ pts: p.pts.slice(), avgY: p.avgY }));
+    console.log('[getCompressedPaths] KEPT_ALL no-DP! paths=' + result.length + ' segs=' + totalSegs + ' (原始路径点正好够)');
+  } else {
+    // Phase 2: 超限才二分搜索极小 eps（0.05~1.0），保证曲线尽可能少变形
+    console.log('[getCompressedPaths] WARN totalSegs=' + totalSegs + ' > MAX=' + MAX_SEGS + ' searching eps...');
+    let lo = 0.05, hi = 1.0, best = 0.1;
+    for (let iter = 0; iter < 14; iter++) {
+      const mid = (lo + hi) / 2;
+      let s = 0;
+      for (const p of paths) { const d = dpOpen(p.pts, mid); if (d.length >= 2) s += d.length - 1; }
+      if (s <= MAX_SEGS) { best = mid; hi = mid; } else { lo = mid; }
+    }
+    bestEps = best;
+    result = [];
+    for (const p of paths) {
+      const s = dpOpen(p.pts, bestEps);
+      if (s.length >= 2) result.push({ pts: s, avgY: p.avgY });
+    }
+    totalSegs = result.reduce((s, p) => s + p.pts.length - 1, 0);
+    // Phase 2.5: dpOpen 后仍超限（碎点太多 eps 压不动）→ 长度优先贪心保留
+    // 保长丢短，绝不让 trimBlkToSize 按 avgY 砍尾（那会砍掉图像底部 = 腿）
+    if (totalSegs > MAX_SEGS) {
+      console.warn('[getCompressedPaths] still over after dpOpen (' + totalSegs + '), length-greedy prune...');
+      result.sort((a, b) => (b.pts.length - 1) - (a.pts.length - 1));
+      const kept2 = [];
+      let acc = 0;
+      for (const p of result) {
+        const segs = p.pts.length - 1;
+        if (acc + segs <= MAX_SEGS) { kept2.push(p); acc += segs; }
+      }
+      result = kept2;
+      totalSegs = acc;
+    }
+  }
+  // Phase 3: 按 avgY 排序输出（视觉顺序：头→身体）
+  result.sort((a, b) => a.avgY - b.avgY);
+  console.log('[getCompressedPaths] kept=' + result.length + ' droppedNoise=' + droppedCount.noise + ' eps=' + bestEps.toFixed(2) + ' segs=' + totalSegs);
+  return result;
+}
+
+// === 公共：blk 坐标路径数组 → 紧凑格式 blk 字符串，带严格字节预算闭环 ===
+// paths: [{ pts:[[blkX,blkY],...], avgY }]（点已经是 WT blk 坐标系）
+// headerLines: blkHeader() 返回的数组（不含 drawLines）
+// byteBudget: 目标总字节上限（调用方留余量，建议 BLK_SIZE_LIMIT - 4096）
+// 返回 { raw, segCount, pathCount, trimmed }
+// 关键：超限时逐级加大 dpOpen eps（全局均匀简化，不砍尾），最后长度优先贪心（保长轮廓=保腿）
+function buildCompactBlkFromBlkPaths(paths, headerLines, byteBudget, options) {
+  const F3 = (v) => { let s = v.toFixed(3); s = s.replace(/\.?0+$/, ''); return s; };
+  const F4 = (v) => { let s = v.toFixed(4); s = s.replace(/\.?0+$/, ''); return s; };
+  const fmtSeg = (x1, y1, x2, y2, isFirst) =>
+    'line{line:p4=' + F4(x1) + ',' + F4(y1) + ',' + F4(x2) + ',' + F4(y2) +
+    (isFirst ? ';move:b=true;}\n' : ';}\n');
+
+  // 用 F4（4 位小数）格式，过滤掉格式化后变成零长度的段
+  function dedupPts(pts) {
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      if (out.length > 0) {
+        const last = out[out.length - 1];
+        if (F4(last[0]) === F4(p[0]) && F4(last[1]) === F4(p[1])) continue;
+      }
+      out.push(p);
+    }
+    return out;
+  }
+  // WT 准心边界：X∈[-0.5, +0.5], Y∈[-0.28125, +0.28125]
+  // 骨架路径端点 clamp 到边界（截断跨边界的段）
+  // dropAllOutside=true 时丢弃两端都在准心外的段（用于 WT blk 输出，避免 67% 段在准心外浪费字节）
+  // dropAllOutside=false 时保留两端都在准心外的段（用于工作台导出，用户可能画在准心外）
+  const XMIN = -0.5, XMAX = 0.5, YMIN = -0.28125, YMAX = 0.28125;
+  const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
+  const dropAllOutside = options && options.dropAllOutside;
+  const clipSeg = (ax, ay, bx, by) => {
+    const aIn = ax >= XMIN && ax <= XMAX && ay >= YMIN && ay <= YMAX;
+    const bIn = bx >= XMIN && bx <= XMAX && by >= YMIN && by <= YMAX;
+    if (aIn && bIn) return [ax, ay, bx, by];
+    if (!aIn && !bIn) return dropAllOutside ? null : [ax, ay, bx, by];
+    // 一个在内部一个在外部 → 把外端 clamp 到边界
+    if (!aIn) {
+      const dx = bx - ax, dy = by - ay;
+      const tx = dx === 0 ? 0 : Math.min(1, Math.max(0, (XMIN - ax) / dx, (XMAX - ax) / dx));
+      const ty = dy === 0 ? 0 : Math.min(1, Math.max(0, (YMIN - ay) / dy, (YMAX - ay) / dy));
+      const t = Math.min(tx || 1, ty || 1);
+      const nax = clamp(ax + dx * t, XMIN, XMAX);
+      const nay = clamp(ay + dy * t, YMIN, YMAX);
+      return [nax, nay, bx, by];
+    } else {
+      const dx = bx - ax, dy = by - ay;
+      const tx = dx === 0 ? 0 : Math.min(1, Math.max(0, (XMIN - bx) / dx, (XMAX - bx) / dx));
+      const ty = dy === 0 ? 0 : Math.min(1, Math.max(0, (YMIN - by) / dy, (YMAX - by) / dy));
+      const t = Math.min(tx || 1, ty || 1);
+      const nbx = clamp(bx - dx * t, XMIN, XMAX);
+      const nby = clamp(by - dy * t, YMIN, YMAX);
+      return [ax, ay, nbx, nby];
+    }
+  }
+
+  function assemble(work) {
+    let s = '', n = 0;
+    for (const p of work) {
+      const pts = dedupPts(p.pts);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        if (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9) continue;
+        const clipped = clipSeg(a[0], a[1], b[0], b[1]);
+        if (!clipped) continue; // dropAllOutside=true 时丢弃准心外的段
+        const [ax, ay, bx, by] = clipped;
+        if (Math.abs(ax - bx) < 1e-9 && Math.abs(ay - by) < 1e-9) continue; // clip 后变成零长度
+        s += fmtSeg(ax, ay, bx, by, i === 0);
+        n++;
+      }
+    }
+    return { s, n };
+  }
+  const assembleFull = (segStrs) => headerLines.concat(['drawLines{', segStrs, '}']).join('\n');
+
+  let work = paths.map(p => ({ pts: p.pts.slice(), avgY: p.avgY }));
+  let { s: segStrs, n: cnt } = assemble(work);
+  let raw = assembleFull(segStrs);
+
+  // Round 1~5：逐级加大 dpOpen eps（blk 坐标单位；0.001 ≈ 画布 0.1%，视觉几乎无损）
+  const epsSteps = [0.0006, 0.0012, 0.0024, 0.0048, 0.0096];
+  let round = 0;
+  while (raw.length > byteBudget && round < epsSteps.length) {
+    const eps = epsSteps[round++];
+    work = work.map(p => ({ pts: dpOpen(p.pts, eps), avgY: p.avgY })).filter(p => p.pts.length >= 2);
+    ({ s: segStrs, n: cnt } = assemble(work));
+    raw = assembleFull(segStrs);
+    console.warn('[blkBudget] round=' + round + ' eps=' + eps + ' paths=' + work.length + ' segs=' + cnt + ' bytes=' + raw.length + '/' + byteBudget);
+  }
+
+  // Round 6：仍超限 → 长度优先贪心（长轮廓先占预算，短碎片丢弃——绝不按位置砍尾=不砍腿）
+  let greedyTrimmed = false;
+  if (raw.length > byteBudget) {
+    greedyTrimmed = true;
+    work.sort((a, b) => (b.pts.length - 1) - (a.pts.length - 1));
+    const headerBytes = headerLines.join('\n').length + 40;
+    const segBudget = Math.floor((byteBudget - headerBytes) / 60); // 保守 60 B/seg（实测 ~56）
+    const kept = [];
+    let accSegs = 0;
+    for (const p of work) {
+      const sg = p.pts.length - 1;
+      if (accSegs + sg <= segBudget) { kept.push(p); accSegs += sg; }
+    }
+    work = kept;
+    ({ s: segStrs, n: cnt } = assemble(work));
+    raw = assembleFull(segStrs);
+    console.warn('[blkBudget] length-greedy prune: paths=' + work.length + ' segs=' + cnt + ' bytes=' + raw.length + '/' + byteBudget);
+  }
+
+  return { raw, segCount: cnt, pathCount: work.length, trimmed: greedyTrimmed };
+}
+
+// buildTraceBlk：紧凑格式 + 字节预算闭环（v2.7）
+// 和 getCompressedPaths 用完全相同的算法确保一致性
+const BUILD_TRACE_BLK_VERSION = 'v2.7';
+function buildTraceBlk(o) {
+  console.log('[buildTraceBlk] version=' + BUILD_TRACE_BLK_VERSION);
+  // === NaN 防护：sight 参数必须有效 ===
   o.x0 = sight.x0; o.y0 = sight.y0; o.w = sight.w;
-  o.artH = o.w * (o.GH / o.GW);
+  if (!isFinite(o.x0) || !isFinite(o.y0) || !isFinite(o.w) || o.w <= 0) {
+    console.error('[buildTraceBlk] FATAL: sight not finite! x0=' + o.x0 + ' y0=' + o.y0 + ' w=' + o.w);
+    alert('❌ 浏览器跑的是旧代码（sight 参数无效）\n请完全关闭浏览器（Ctrl+Shift+W 关掉所有窗口）\n再重新打开：http://127.0.0.1:18925/wt-sight-studio.html?v=262\n版本：' + BUILD_TRACE_BLK_VERSION);
+    return null;
+  }
+  if (!isFinite(WT_X_OFFSET) || !isFinite(WT_Y_CENTER)) {
+    console.error('[buildTraceBlk] FATAL: WT constants missing! WT_X_OFFSET=' + WT_X_OFFSET + ' WT_Y_CENTER=' + WT_Y_CENTER);
+    alert('❌ 浏览器跑的是极度旧的代码（WT 常量丢失）\n请完全关闭浏览器后重新打开页面\n版本：' + BUILD_TRACE_BLK_VERSION);
+    return null;
+  }
+  // === 防护结束 ===
   const L = blkHeader(o);
   pushDrawTexts(L, o);
-  o.lines = '';
-  const artH = o.artH;
-  const effFillStrength = o.fillStrength || 3;
-  const FILL_STEP_ROWS = (effFillStrength <= 1) ? 2 : ((effFillStrength === 2 && !o.__forceFillDense) ? 2 : 1);
-  const LINE_STEP = 2;
-  // 收集所有段，标注优先级供 safePack 智能裁剪
-  // P0=手动层 P1=生成轮廓 P2=生成填充 P3=短碎片
-  const packSegs = [];
-  // Phase 1: 生成层填充（P2）
-  for (const pl of o._polylines) {
-    if (!pl.fill) continue;
-    const s = pl.p;
-    const a = s[0], b = s[1];
-    const ay = a[1];
-    if (FILL_STEP_ROWS > 1) {
-      const ayInt = Math.floor(ay);
-      if ((ayInt % FILL_STEP_ROWS) !== 0) continue;
-    }
-    const ax = o.x0 + a[0] / o.GW * o.w, ayW = o.y0 * Y_BLK_SCALE + (a[1] / o.GH) * artH;
-    const bx = o.x0 + b[0] / o.GW * o.w, byW = o.y0 * Y_BLK_SCALE + (b[1] / o.GH) * artH;
-    if (Math.abs(ax - bx) < 1e-9 && Math.abs(ayW - byW) < 1e-9) continue;
-    const segStr = '  line {line:p4=' + F(ax + WT_X_OFFSET) + ',' + F(ayW - WT_Y_CENTER) + ',' + F(bx + WT_X_OFFSET) + ',' + F(byW - WT_Y_CENTER) + '; move:b=false;}\n';
-    packSegs.push({ pri: 2, y: Math.floor(ay), str: segStr, isFill: true });
+  const GW = o.GW, GH = o.GH, artH = o.w * GH / GW;
+  // 用公共函数拿压缩后的路径（grid 坐标）
+  const compressed = getCompressedPaths(o);
+  console.log('[traceBlk] compressed paths=' + compressed.length + ' eps=' + (o._traceEps || 'auto'));
+  // grid 坐标 → WT blk 坐标
+  const blkPaths = compressed.map(cp => {
+    const pts = cp.pts.map(a => [
+      o.x0 + (a[0] / GW) * o.w + WT_X_OFFSET,
+      o.y0 * Y_BLK_SCALE + (a[1] / GH) * artH - WT_Y_CENTER
+    ]);
+    return { pts, avgY: cp.avgY };
+  });
+  // 严格字节预算闭环（≤ BLK_SIZE_LIMIT-4096，绝不靠砍尾部）
+  const r = buildCompactBlkFromBlkPaths(blkPaths, L, BLK_SIZE_LIMIT - 4096, { dropAllOutside: true });
+  console.log('[traceBlk] FINAL: ' + r.pathCount + ' paths, ' + r.segCount + ' segs, ' + r.raw.length + '/' + BLK_SIZE_LIMIT + ' bytes' + (r.trimmed ? ' [greedy-pruned]' : ''));
+  if (r.raw.length > BLK_SIZE_LIMIT) {
+    // 理论上不会触发（闭环已保证），最后防线
+    console.error('[traceBlk] still over budget after closed-loop! falling back to trim');
+    return trimBlkToSize(r.raw, BLK_SIZE_LIMIT).str;
   }
-  // Phase 2: 生成层轮廓（P1）
-  for (const pl of o._polylines) {
-    if (pl.fill) continue;
-    const pts = pl.p;
-    const lim = pl.closed ? pts.length : pts.length - 1;
-    for (let i = 0; i < lim; i += LINE_STEP) {
-      const a = pts[i], b = pts[Math.min((i + LINE_STEP), (pl.closed ? pts.length : pts.length - 1)) % (pl.closed ? pts.length : pts.length)];
-      const ax = o.x0 + a[0] / o.GW * o.w, ayW = o.y0 * Y_BLK_SCALE + (a[1] / o.GH) * artH;
-      const bx = o.x0 + b[0] / o.GW * o.w, byW = o.y0 * Y_BLK_SCALE + (b[1] / o.GH) * artH;
-      if (Math.abs(ax - bx) < 1e-9 && Math.abs(ayW - byW) < 1e-9) continue;
-      const segStr = '  line {line:p4=' + F(ax + WT_X_OFFSET) + ',' + F(ayW - WT_Y_CENTER) + ',' + F(bx + WT_X_OFFSET) + ',' + F(byW - WT_Y_CENTER) + '; move:b=false;}\n';
-      const ay = (a[1] + b[1]) / 2;
-      packSegs.push({ pri: 1, y: Math.floor(ay), str: segStr, isFill: false });
+  return r.raw;
+}
+
+// 描边模式：逐行扫描像素 → wiki 格式 move:b=false（和 reisen_sight_12.blk 完全一致）
+// 每行连续墨水像素 → 一条水平线段；不骨架化、不平滑，保留原始像素细节
+function buildOutlineBlk(o) {
+  console.log('[outlineBlk] start');
+  if (!o._inkMask) { console.error('[outlineBlk] no ink mask!'); return null; }
+  // === 同步 sight 参数（和 buildTraceBlk 一样）===
+  o.x0 = sight.x0; o.y0 = sight.y0; o.w = sight.w;
+  const GW = o.GW, GH = o.GH, ink = o._inkMask;
+  const sightW = o.w, sightX0 = o.x0, sightY0 = o.y0;
+  const artH = sightW * GH / GW;
+  const F = (v) => { let s = v.toFixed(5); s = s.replace(/\.?0+$/, ''); return s; };
+
+  // blk header（和经典模式共用）
+  const L = blkHeader(o);
+  pushDrawTexts(L, o);
+  L.push('drawLines{');
+
+  // 逐行扫描，每行找连续墨水像素 run → 水平线段
+  let segs = '';
+  let segCount = 0;
+  for (let y = 0; y < GH; y++) {
+    const rowOff = y * GW;
+    let x = 0;
+    while (x < GW) {
+      // 跳过空白像素
+      while (x < GW && !ink[rowOff + x]) x++;
+      if (x >= GW) break;
+      // 找连续墨水 run 的右端
+      const x0 = x;
+      while (x < GW && ink[rowOff + x]) x++;
+      const x1 = x - 1; // 最后一个墨水像素
+
+      // grid 坐标 → sight box → WT blk 坐标
+      const wx0 = sightX0 + (x0 / GW) * sightW;
+      const wx1 = sightX0 + (x1 / GW) * sightW;
+      const wy = sightY0 * Y_BLK_SCALE + (y / GH) * artH;
+      const bx0 = wx0 + WT_X_OFFSET, by0 = wy - WT_Y_CENTER;
+      const bx1 = wx1 + WT_X_OFFSET, by1 = wy - WT_Y_CENTER;
+
+      if (Math.abs(bx1 - bx0) < 1e-9) continue; // 零长度跳过
+      const runCols = x1 - x0 + 1;
+      if (runCols < 2) continue; // 只过滤单像素噪点，保留 2+ 列的线（AI 线稿膨胀后仍有细线）
+      // 不做 Y/X clip 硬跳过——所有段都输出，WT 自己裁剪超出屏幕的
+      // （之前硬跳过跨准心边界的 run 导致大量线条缺失）
+      segs += '  line {line:p4=' + F(bx0) + ',' + F(by0) + ',' + F(bx1) + ',' + F(by1) + '; move:b=false;}\n';
+      segCount++;
     }
   }
-  // Phase 3: 手动层线条（P0）
-  const showManual = $('showManualChk') && $('showManualChk').checked;
-  if (showManual) {
-    for (const ln of manualState.lines) {
-      const segStr = '  line {line:p4=' + F(ln.x1) + ',' + F(ln.y1) + ',' + F(ln.x2) + ',' + F(ln.y2) + '; move:b=false;}\n';
-      // 手动水平扫描线（y1≈y2）标记为 isFill 供降采样；其他手动线 isFill=false 不降采样
-      const isFill = Math.abs(ln.y1 - ln.y2) < 1e-6;
-      const y = Math.floor((ln.y1 + ln.y2) / 2 * 1000); // 用 blk 坐标 Y*1000 做排序键
-      packSegs.push({ pri: 0, y, str: segStr, isFill });
-    }
-    // 手动文字用 text{} section（不计入段数限制，单独追加）
-  }
-  // 智能容量管理：safePack 保证 ≤ maxSize 且 ≤ maxSeg
-  const RMAXSEG = 15000;
-  const packed = safePack(packSegs, BLK_SIZE_LIMIT, RMAXSEG);
-  o.lines = packed.lines;
-  L.push('drawLines{'); L.push(o.lines); L.push('}');
-  // 追加手动文字（text{} section，体积小不参与段数限制）
-  if (showManual) {
-    for (const t of manualState.texts) {
-      L.push('  text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F(t.x) + ',' + F(t.y) + '; size=' + F(t.size) + '; move:b=false;}\n');
-    }
-  }
+  L.push(segs);
+  L.push('}');
   let raw = L.join('\n');
-  // 兜底：safePack 后理论上已 ≤ LIMIT，但 text{} 追加可能微超，最终裁一次
-  let rCapped = packed.capped;
-  let rCappedB = 0;
+  console.log('[outlineBlk] segs=' + segCount + ' bytes=' + raw.length + '/' + BLK_SIZE_LIMIT);
+
+  // 字节预算闭环：超限时按行跳（跳过某些行，每行全保留或全丢弃），保证预览和 .blk 完全一致
+  o._outlineSkipFactor = 1;
   if (raw.length > BLK_SIZE_LIMIT) {
-    const t = trimBlkToSize(raw, BLK_SIZE_LIMIT);
-    raw = t.str;
-    rCapped = true;
-    rCappedB = t.trimmed;
+    console.warn('[outlineBlk] over budget, reducing resolution...');
+    const headerBytes = L.slice(0, -2).join('\n').length + 40;
+    const targetSegs = Math.floor((BLK_SIZE_LIMIT - headerBytes) / 55); // ~55 B/seg
+    // 先用完整扫描算每行平均段数
+    const segsPerRow = segCount / GH;
+    // 目标行数：targetSegs / 每行平均段数
+    const targetRows = Math.max(1, Math.ceil(targetSegs / Math.max(1, segsPerRow)));
+    const rowSkip = Math.max(1, Math.ceil(GH / targetRows)); // 每隔 rowSkip 行取一行
+    o._outlineSkipFactor = rowSkip;
+    console.warn('[outlineBlk] rowSkip=' + rowSkip + ' (keep every ' + rowSkip + 'th row)');
+
+    segs = '';
+    segCount = 0;
+    for (let y = 0; y < GH; y++) {
+      if (y % rowSkip !== 0) continue; // 按行跳
+      const rowOff = y * GW;
+      let x = 0;
+      while (x < GW) {
+        while (x < GW && !ink[rowOff + x]) x++;
+        if (x >= GW) break;
+        const x0 = x;
+        while (x < GW && ink[rowOff + x]) x++;
+        const x1 = x - 1;
+
+        const wx0 = sightX0 + (x0 / GW) * sightW;
+        const wx1 = sightX0 + (x1 / GW) * sightW;
+        const wy = sightY0 * Y_BLK_SCALE + (y / GH) * artH;
+        const bx0 = wx0 + WT_X_OFFSET, by0 = wy - WT_Y_CENTER;
+        const bx1 = wx1 + WT_X_OFFSET, by1 = wy - WT_Y_CENTER;
+        if (Math.abs(bx1 - bx0) < 1e-9) continue;
+        if (x1 - x0 + 1 < 2) continue; // 只过滤单像素噪点
+        segs += '  line {line:p4=' + F(bx0) + ',' + F(by0) + ',' + F(bx1) + ',' + F(by1) + '; move:b=false;}\n';
+        segCount++;
+      }
+    }
+    L[L.length - 2] = segs;
+    raw = L.join('\n');
+    console.warn('[outlineBlk] after trim: segs=' + segCount + ' bytes=' + raw.length + '/' + BLK_SIZE_LIMIT);
   }
-  lastBlk = raw;
-  o.sizeBytes   = raw.length;
-  o.cappedBytes = rCappedB;
-  o.maxBytes    = BLK_SIZE_LIMIT;
-  o.isComplete  = !rCapped;
-  o.segCount    = packed.count;
-  o.packReason  = packed.reason;
-  // 降级提示：safePack 触发降级时在状态栏提示用户
-  if (packed.capped && packed.reason) {
-    const sizeKB = (raw.length / 1024).toFixed(1);
-    setStatus('⚠ 容量保护已触发：' + packed.reason + ' · 当前 ' + packed.count + ' 段 / ' + sizeKB + 'KB · 手动层优先保留', 'ok');
+
+  if (raw.length > BLK_SIZE_LIMIT) {
+    raw = trimBlkToSize(raw, BLK_SIZE_LIMIT).str;
   }
-  lastOpts = o;
+  return raw;
+}
+
+// 给已生成的 .blk 追加手动层（绘画工作台画的线条/文字）
+// 用紧凑格式（和 buildTraceBlk 输出完全一致，绝不 wiki 格式混紧凑格式）
+function appendManualLayerToBlk(blkStr) {
+  if (!blkStr) return blkStr;
+  const showManual = $('showManualChk') && $('showManualChk').checked;
+  if (!showManual) return blkStr;
+  let L = '';
+  const F3 = (v) => { let s = v.toFixed(3); s = s.replace(/\.?0+$/, ''); return s; };
+  for (const ln of manualState.lines) {
+    L += 'line{line:p4=' + F3(ln.x1) + ',' + F3(ln.y1) + ',' + F3(ln.x2) + ',' + F3(ln.y2) + ';move:b=true;}\n';
+  }
+  // 手动文字用 text{} section
+  let T = '';
+  for (const t of manualState.texts) {
+    T += 'text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F3(t.x) + ',' + F3(t.y) + '; size=' + F3(t.size) + '; move:b=true;}\n';
+  }
+  if (!L && !T) return blkStr;
+  // 找到 drawLines{} 块的结尾（括号平衡算法）
+  // 不能用 indexOf('}', start)——每个 line{} 里都有 }，会找到第一个 line 的 }
+  // 不能用 lastIndexOf('}')——drawLines 后面可能还有其他 section
+  // 正确方法：从 drawLines{ 开始数括号深度，当深度回到 0 时就是 drawLines 的 closing }
+  const drawLinesStart = blkStr.indexOf('drawLines{');
+  if (drawLinesStart < 0) return blkStr;
+  let depth = 0;
+  let drawLinesEnd = -1;
+  for (let i = drawLinesStart; i < blkStr.length; i++) {
+    const c = blkStr[i];
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) { drawLinesEnd = i; break; }
+    }
+  }
+  if (drawLinesEnd < 0) return blkStr; // 没找到闭合括号，文件本身就坏了
+  return blkStr.substring(0, drawLinesEnd) + '\n' + L + '}' + blkStr.substring(drawLinesEnd + 1) + (T ? '\ntext{\n' + T + '}\n' : '');
+}
+
+function regenerateBlkFromLastOpts() {
+  if (!lastOpts) return;
+  // 不强制 autoFitSightBox——用户手动调的 sight 参数保留；用户点 zoomFit 按钮才重 fit
+  // === 统一管线：不管 genMode 是什么，都走 buildTraceBlk → buildCompactBlkFromBlkPaths → 紧凑格式 ===
+  // （genMode 在 convert() 里影响 _rawPaths/_polylines 的生成方式，不影响输出格式）
+  const mode = $('genMode')?.value || 'trace';
+  if (!lastOpts._rawPaths?.length) {
+    // normal 模式可能只有 _polylines（逐行扫描），现转成 grid 路径
+    if (lastOpts._polylines?.length) {
+      console.log('[regenBlk] trace requested but _rawPaths empty, converting _polylines...');
+      lastOpts._rawPaths = lastOpts._polylines.filter(pl => !pl.fill && pl.p?.length >= 4).map(pl => pl.p.map(pt => [pt[0], pt[1]]));
+      console.log('[regenBlk] converted ' + lastOpts._rawPaths.length + ' polylines to grid paths');
+    } else {
+      console.warn('[regenBlk] no _rawPaths or _polylines, skipping');
+      return lastBlk;
+    }
+  }
+  lastBlk = buildTraceBlk(lastOpts);
+  // 手动层追加（统一紧凑格式，和 drawLines 一致）
+  const showManual = $('showManualChk') && $('showManualChk').checked;
+  if (showManual && (manualState.lines.length || manualState.texts.length)) {
+    lastBlk = appendManualLayerToBlk(lastBlk);
+  }
+  // 收尾：更新全局状态、启用下载按钮
+  lastOpts = lastOpts; // 保持引用不变
   window.__lastBlk = lastBlk; window.__lastOpts = lastOpts;
   dl.disabled = false;
+  if ($('viewerBtn')) $('viewerBtn').disabled = false;
   syncFormFromSight();
   return lastBlk;
 }
@@ -4390,8 +4793,8 @@ function generateManualOnlyBlk() {
   // 用默认空参数构造 blk 头部
   // cross：主页面读用户复选框（默认勾选），工作台没有复选框则默认 true
   const o = {
-    x0: sight.x0 || 0.02, y0: sight.y0 || 0.02, w: sight.w || 0.2,
-    GW: 800, GH: 450, artH: (sight.w || 0.2) * 0.5625,
+    x0: sight.x0 || 0, y0: sight.y0 || 0, w: sight.w || 0.35,
+    GW: 800, GH: 450, artH: (sight.w || 0.35) * 0.5625,
     cross: ($('cross')?.checked ?? true), mark: '',
     fillStrength: 0, lines: '',
   };
@@ -4400,7 +4803,7 @@ function generateManualOnlyBlk() {
   // 收集手动层段（全部 P0）
   const packSegs = [];
   for (const ln of manualState.lines) {
-    const segStr = '  line {line:p4=' + F(ln.x1) + ',' + F(ln.y1) + ',' + F(ln.x2) + ',' + F(ln.y2) + '; move:b=false;}\n';
+    const segStr = '  line {line:p4=' + F(ln.x1) + ',' + F(ln.y1) + ',' + F(ln.x2) + ',' + F(ln.y2) + '; move:b=true;}\n';
     const isFill = Math.abs(ln.y1 - ln.y2) < 1e-6;
     const y = Math.floor((ln.y1 + ln.y2) / 2 * 1000);
     packSegs.push({ pri: 0, y, str: segStr, isFill });
@@ -4410,7 +4813,7 @@ function generateManualOnlyBlk() {
   L.push('drawLines{'); L.push(packed.lines); L.push('}');
   // 手动文字
   for (const t of manualState.texts) {
-    L.push('  text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F(t.x) + ',' + F(t.y) + '; size=' + F(t.size) + '; move:b=false;}\n');
+    L.push('  text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F(t.x) + ',' + F(t.y) + '; size=' + F(t.size) + '; move:b=true;}\n');
   }
   let raw = L.join('\n');
   if (raw.length > BLK_SIZE_LIMIT) {
@@ -4453,7 +4856,22 @@ $('bgFile').onchange = () => {
   im.onerror = () => setStatus('底图加载失败', 'err');
   im.src = URL.createObjectURL(f);
 };
-$('zoomFitBtn').onclick = () => { sight.w = 0.20; sight.x0 = 0.02; sight.y0 = 0.02; syncFormFromSight(); redrawSight(); if (lastBlk) regenerateBlkFromLastOpts(); };
+// contain-fit：等比缩放到 WT 准心内，完整显示不变形
+// 用户点「zoomFit」按钮时触发（doGenerate 不自动调）
+function autoFitSightBox() {
+  if (!img || !lastOpts) return;
+  const ratioHW = lastOpts.GH / lastOpts.GW; // 图像高宽比
+  const WT_HW = 9 / 16;                     // WT 准心高宽比 = 0.5625
+  if (ratioHW >= WT_HW) {
+    sight.w = WT_HW / ratioHW;               // 竖版图：撑满高度 → w 较小
+  } else {
+    sight.w = 1.0;                           // 横版图：撑满宽度 → w=1
+  }
+  sight.x0 = (1 - sight.w) / 2;
+  sight.y0 = 0;
+}
+
+$('zoomFitBtn').onclick = () => { autoFitSightBox(); syncFormFromSight(); redrawSight(); if (lastBlk) regenerateBlkFromLastOpts(); };
 
 // ============ go / goManual / dl ============
 // Cached auto-tune result. Freshly recomputed on "一键生成"; "用当前设置生成" reuses it
@@ -4468,7 +4886,9 @@ function resolveOptions(img, auto) {
   const v_dpEps = Math.max(0.1, num('dpEps') || auto.dpEps);
   const v_thrOff = (Math.round(num('thrOff')) !== 0 ? num('thrOff') : auto.thrOff);
   let v_bridge = Math.round(num('bridge'));
-  if (v_bridge < 0) v_bridge = auto.bridge; else v_bridge = Math.max(0, Math.min(3, v_bridge));
+  const scanMode = ($('genMode')?.value === 'outline' || $('genMode')?.value === 'trace');
+  if (v_bridge < 0) v_bridge = scanMode ? 3 : auto.bridge; else v_bridge = Math.max(0, Math.min(3, v_bridge));
+  if (scanMode && v_bridge < 2) v_bridge = 2; // 扫描模式最少 bridge=2 保证墨水区连成片
   const v_minLen = Math.max(1, Math.min(30, Math.round(num('minLen')) || auto.minLen));
   const v_fillStrength = Math.max(0, Math.min(6, Math.round(num('fillStrength'))));
   const v_fillStrengthEff = v_fillStrength === 0 ? auto.fillStrength : v_fillStrength;
@@ -4482,10 +4902,10 @@ function resolveOptions(img, auto) {
   const v_deArea = v_deAreaUI === 0 ? auto.deArea : v_deAreaUI;
   const v_protectRUI = Math.max(0, Math.min(8, Math.round(num('protectR') || 0)));
   const v_protectR = v_protectRUI === 0 ? auto.protectR : v_protectRUI;
-  // 填充方式：auto = 智能方案选择（简单图形→scan，动漫→quads，照片→scan）
+  // 填充方式：auto = 复杂图（边缘密度阈值判定）用 drawQuads 实心填充，简单图走传统扫描线
   const v_fillModeUI = $('fillMode') ? $('fillMode').value : 'auto';
   const v_fillMode = v_fillModeUI === 'auto'
-    ? ((auto.plan && auto.plan.fillMode) || ((auto.diagnostics && auto.diagnostics.complex) ? 'quads' : 'scan'))
+    ? ((auto.diagnostics && auto.diagnostics.complex) ? 'quads' : 'scan')
     : v_fillModeUI;
   const o = {
     cL, cT, cR, cB,
@@ -4498,7 +4918,6 @@ function resolveOptions(img, auto) {
     fillStrength: v_fillStrengthEff, fillMin: v_fillMin, protectR: v_protectR,
     bgTol: v_bgTol,
     srcOriginal: srcOriginal || null,   // 动漫暗区还原用；无则跳过该特性
-    planDarkRestore: auto.plan ? auto.plan.darkRestore : true,  // 智能方案决定是否启用暗区还原
     bgV1: $('bgV1').checked, bgAggr: $('bgAggr').checked,
     x0: sight.x0, y0: sight.y0, w: sight.w,
     cross: $('cross').checked,
@@ -4539,9 +4958,8 @@ function buildStatusFromRun(r, autoTuneUsed) {
      ' 护眼' + v_protectR + '(' + prMark + ')' +
      (deb ? (' 墨格 ' + deb.inkBefore + '→' + deb.inkAfter) : '')) : '';
   const tuneTxt = autoTuneUsed ? '（重新自动判断）' : '（沿用上次自动）';
-  const planTxt = (auto.plan && autoTuneUsed) ? (' · 方案：' + auto.plan.reason) : '';
   return (
-    '生成完成' + tuneTxt + planTxt + '：参数：网格 ' + v_gridW + '(' + man(v_gridW, auto.gridW) + ')' +
+    '生成完成' + tuneTxt + '：参数：网格 ' + v_gridW + '(' + man(v_gridW, auto.gridW) + ')' +
     ' eps ' + (+v_dpEps).toFixed(2) + '(' + man(v_dpEps, auto.dpEps) + ')' +
     ' 阈值偏移 ' + v_thrOff + '(' + man(v_thrOff, auto.thrOff) + ')' +
     ' 桥接 ' + v_bridge + '(' + man(v_bridge, auto.bridge) + ')' +
@@ -4563,6 +4981,36 @@ function doGenerate({ retuneAuto, buttonLabel }) {
   if (__regenTimer) { clearTimeout(__regenTimer); __regenTimer = null; }
   if (!img) return;
   go.disabled = true; const goM = $('goManual'); if (goM) goM.disabled = true;
+
+  const mode = $('genMode')?.value || 'trace';
+  // === 强制保护：outline 模式必须用原图（不能是 AI 线稿）===
+  if (mode === 'outline' && srcOriginal && img !== srcOriginal) {
+    console.log('[doGenerate] outline 模式：强制恢复 img 到原图（之前可能被 trace 的 AI sketch 覆盖）');
+    img = srcOriginal;
+    window.__traceSketchApplied = false;
+  }
+  console.log('[v2.3 doGenerate] start mode=' + mode + ' retuneAuto=' + retuneAuto + ' img=' + img.width + 'x' + img.height + ' sight_before={w:' + sight.w.toFixed(3) + ',x0:' + sight.x0.toFixed(3) + ',y0:' + sight.y0.toFixed(3) + '}');
+
+  // === trace 模式：先自动跑 AI 转线稿（如果还没跑过）===
+  if (mode === 'trace' && !window.__traceSketchApplied) {
+    console.log('[v2.3 doGenerate] AUTO-running aiSketch()...');
+    setStatus('AI 自动描边需要先转线稿，正在自动跑 AI 转线稿…（首次较慢）', 'busy');
+    setTimeout(async () => {
+      try {
+        await aiSketch(true);
+        window.__traceSketchApplied = true;
+        console.log('[v2.3 doGenerate] aiSketch done, recursing...');
+        doGenerate({ retuneAuto, buttonLabel }); // 线稿替换完 img 后再递归一次
+      } catch (e) {
+        console.error('[v2.3 doGenerate] aiSketch FAILED:', e);
+        setStatus('AI 转线稿失败：' + e.message + '（请改用 XDoG 或上传已转好的线稿）', 'err');
+        go.disabled = false; if (goM) goM.disabled = false;
+      }
+    }, 30);
+    return;
+  }
+  console.log('[v2.3 doGenerate] traceSketchApplied=' + window.__traceSketchApplied + ' continuing...');
+
   setStatus((buttonLabel || '正在生成') + '…', 'busy');
   setTimeout(() => {
     try {
@@ -4594,14 +5042,55 @@ function doGenerate({ retuneAuto, buttonLabel }) {
         updateAutoTags(auto);
       }
       const r = resolveOptions(img, auto);
-      lastBlk = convert(r.o);
-      window.__lastBlk = lastBlk; window.__lastOpts = lastOpts; window.__auto = auto;
+      convert(r.o); // convert 内部设 lastOpts
+      window.__lastOpts = lastOpts; window.__auto = auto;
+
+      // sight 参数保持用户设置（默认 w=0.35, x0=0, y0=0），不自动 cover-fit 撑满
+      // 想重置为等比缩放到准心内不变形：点「zoomFit」按钮
+
+      // === 回退方案：两个模式统一走 buildOutlineBlk（wiki 格式，reisen12 风格）===
+      // 之前 buildTraceBlk（紧凑格式 + 骨架追踪 + F4 小数）断断续续、精度不够、clip 复杂
+      // 现在 trace 只在 convert() 里多跑一步 AI sketch 把原图转干净线稿，
+      // 之后跟 outline 完全一样：Otsu 二值化 → ink mask → 逐行扫描 → wiki 格式 → F5 小数 → Y clip
+      // 这样两个模式输出的 .blk 都是经过验证的、WT 能用的格式
+      if (!lastOpts._inkMask) {
+        setStatus('没有墨水数据（可能图像太暗/太白）', 'err');
+        go.disabled = false; const goM3 = $('goManual'); if (goM3) goM3.disabled = false;
+        return;
+      }
+      lastBlk = buildOutlineBlk(lastOpts);
+      const showManual = $('showManualChk') && $('showManualChk').checked;
+      if (showManual && (manualState.lines.length || manualState.texts.length)) {
+        lastBlk = appendManualLayerToBlk(lastBlk);
+      }
+      lastTraceBlk = lastBlk;
+      window.__lastBlk = lastBlk;
       dl.disabled = false;
+  if ($('viewerBtn')) $('viewerBtn').disabled = false;
+
       syncFormFromSight();
       syncSlidersFromNumbers();
       applyPanelSentinelStylesToAll();
       redrawSight();
-      setStatus(buildStatusFromRun(r, autoTuneUsed), 'ok');
+      const modeTag = mode === 'trace' ? ' · 描边模式（AI 转线稿 + 骨架追踪）' : mode === 'outline' ? ' · 经典模式（视频模式）' : '';
+      setStatus(buildStatusFromRun(r, autoTuneUsed) + modeTag, 'ok');
+
+      // === 关键诊断：计算 blk 中 Y 坐标实际范围 ===
+      try {
+        const allY = [];
+        const re = /line:p4=([-\d.,]+)/g;
+        let m;
+        while ((m = re.exec(lastBlk)) !== null) {
+          const nums = m[1].split(',').map(Number);
+          for (let i = 1; i < nums.length; i += 2) allY.push(nums[i]);
+        }
+        if (allY.length) {
+          const minY = Math.min(...allY), maxY = Math.max(...allY);
+          const cov = ((maxY - minY) / 0.5625 * 100).toFixed(1);
+          console.log('[v2.3 FINAL] blk segments=' + allY.length/2 + '  blkY range=[' + minY.toFixed(4) + ' .. ' + maxY.toFixed(4) + ']  coverage=' + cov + '%  WT full=[-0.2812..+0.2812]');
+          console.log('[v2.3 FINAL] sight={w:' + sight.w.toFixed(3) + ',x0:' + sight.x0.toFixed(3) + ',y0:' + sight.y0.toFixed(3) + '}  center_blkY=' + ((sight.y0 + sight.w * 16/9 * (lastOpts.GH/lastOpts.GW) / 2) * 9/16 - 9/32).toFixed(4));
+        }
+      } catch(e) { console.warn('[v2.3] Y-range diag failed', e); }
     } catch (e) {
       setStatus('生成失败：' + e.message, 'err'); console.error(e);
     }
@@ -4609,39 +5098,30 @@ function doGenerate({ retuneAuto, buttonLabel }) {
   }, 30);
 }
 
-// 生成瞄具 .blk：如果当前 img 还没转线稿，自动先跑 AI 转线稿再生成；已转线稿则直接生成
-go.onclick = async () => {
-  if (!img) { setStatus('请先上传图片', 'err'); return; }
-  if (!isSketchApplied) {
-    // 自动先转线稿（按智能方案选模型）
-    setStatus('自动转线稿中…', 'busy');
-    try {
-      await aiSketch(true);
-    } catch (e) {
-      setStatus('自动转线稿失败：' + (e.message || e), 'err');
-      return;
-    }
-    if (!isSketchApplied) return;   // aiSketch 失败时 isSketchApplied 不会变 true
-  }
-  doGenerate({ retuneAuto: true, buttonLabel: '正在重新自动判断参数并生成瞄具' });
-};
-// 一键出：AI 转线稿 + 生成瞄具串成一个动作，用户加载图后点一次就行
-const oc = $('goOneClick');
-if (oc) oc.onclick = async () => {
-  if (!img) { setStatus('请先上传图片', 'err'); return; }
-  oc.disabled = true; go.disabled = true; $('skRun').disabled = true;
-  setStatus('✨ 一键出：AI 转线稿中…', 'busy');
-  try {
-    await aiSketch(true);
-    setStatus('✨ 一键出：自动调参 + 生成瞄具中…', 'busy');
-    await doGenerate({ retuneAuto: true, buttonLabel: '✨ 一键出：自动调参并生成' });
-  } catch (e) {
-    setStatus('一键出失败：' + (e.message || e), 'err');
-  }
-  oc.disabled = false; go.disabled = !img; $('skRun').disabled = !img;
-};
+go.onclick = () => doGenerate({ retuneAuto: true,  buttonLabel: '正在重新自动判断参数并生成瞄具' });
 const gm = $('goManual');
 if (gm) gm.onclick = () => doGenerate({ retuneAuto: false, buttonLabel: '正在按当前设置生成瞄具' });
+
+// 生成模式切换：即时重绘预览 + 如果 studio 已打开也刷新底图
+const genModeEl = $('genMode');
+if (genModeEl) genModeEl.onchange = () => {
+  const newMode = genModeEl.value;
+  // 切到 outline 模式时恢复 img 到原图（如果之前 trace 跑 AI sketch 覆盖了 img）
+  if (newMode === 'outline' && window.__traceSketchApplied && srcOriginal) {
+    console.log('[genMode] 切到 outline，恢复 img 到原图（trace 模式 AI sketch 曾覆盖）');
+    img = srcOriginal;
+    window.__traceSketchApplied = false;
+  }
+  window.__traceSketchApplied = false; // 切模式重置标记，下次 trace 会自动跑 AI 转线稿
+  if (lastOpts) redrawSight();
+  // studio 开着的话：清除 AI 底图标记让 studioLoadReference 重新画
+  if ($('studioOverlay')?.classList.contains('show')) {
+    studio._edited = false;
+    studio._aiDrawn = false;
+    studio.userCtx.clearRect(0, 0, studio.W, studio.H);
+    studioLoadReference();
+  }
+};
 
 // ============ SLIDERS + LIVE LINKAGE ============
 const PARAM_SPEC = [
@@ -4663,9 +5143,9 @@ const PARAM_SPEC = [
   { id:'cR', min:0, max:1, step:0.01, noAuto:true, heavy:true },
   { id:'cB', min:0, max:1, step:0.01, noAuto:true, heavy:true },
   // —— 位置/大小（light：只调方框+坐标，缓存polyline直接重写blk，不用重骨架）——
-  { id:'x0', min:0,    max:0.9, step:0.005, noAuto:true, heavy:false },
-  { id:'y0', min:0,    max:0.9, step:0.005, noAuto:true, heavy:false },
-  { id:'w',  min:0.05, max:0.6, step:0.005, noAuto:true, heavy:false },
+  { id:'x0', min:-0.5, max:1.5, step:0.005, noAuto:true, heavy:false },
+  { id:'y0', min:-1,   max:1.5, step:0.005, noAuto:true, heavy:false },
+  { id:'w',  min:0.05, max:1.5, step:0.005, noAuto:true, heavy:false },
 ];
 function _numOr0(id){ const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; }
 function isSentinel(spec){
@@ -4735,6 +5215,7 @@ function runLiveConvert(){
     lastBlk = convert(r.o);
     window.__lastBlk = lastBlk; window.__lastOpts = lastOpts;
     dl.disabled = false;
+  if ($('viewerBtn')) $('viewerBtn').disabled = false;
     applyPanelSentinelStylesToAll();
     syncSlidersFromNumbers();
     redrawSight();
@@ -4750,9 +5231,9 @@ function runLiveConvert(){
 // —— light 参数（x0/y0/w）联动：只调 sight box 并 regenerateBlkFromLastOpts ——
 function liveSightFromForm(){
   if (typeof sight === 'undefined' || !sight) return;
-  const x0 = Math.min(0.9,  Math.max(0,    _numOr0('x0')));
-  const y0 = Math.min(0.9,  Math.max(0,    _numOr0('y0')));
-  const w  = Math.min(0.6,  Math.max(0.05, _numOr0('w')));
+  const x0 = Math.min(1.5,  Math.max(-0.5, _numOr0('x0')));
+  const y0 = Math.min(1.5,  Math.max(-1,    _numOr0('y0')));
+  const w  = Math.min(1.5,  Math.max(0.05,  _numOr0('w')));
   sight.x0 = x0; sight.y0 = y0; sight.w = w;
   redrawSight();
   if (lastOpts) {
@@ -4811,6 +5292,26 @@ dl.onclick = () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
 
+// === 查看 .blk 按钮 ===
+const viewerBtn = $('viewerBtn');
+if (viewerBtn) {
+  viewerBtn.onclick = () => {
+    if (!lastBlk) { setStatus('先生成瞄具再查看', 'err'); return; }
+    // 把 blk 内容存到 sessionStorage，然后跳转查看器
+    try {
+      sessionStorage.setItem('blk_viewer_data', lastBlk);
+      window.open('blk_viewer.html', '_blank');
+    } catch (e) {
+      // sessionStorage 超限或不可用：退回 blob URL
+      const blob = new Blob([lastBlk], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      setStatus('已生成 .blk，请在查看器里手动打开此文件（sessionStorage 不可用）', 'err');
+      console.warn('[viewerBtn] sessionStorage failed:', e);
+    }
+  };
+}
+
+
 // $('dlManual') 按钮已移除，保留 generateManualOnlyBlk 函数供调试
 if ($('dlManual')) $('dlManual').onclick = () => {
   const blk = generateManualOnlyBlk();
@@ -4826,7 +5327,7 @@ if ($('dlManual')) $('dlManual').onclick = () => {
 // ============ debug hooks (preserved) ============
 window.__load = url => new Promise(res => {
   const im = new Image();
-  im.onload = () => { img = im; srcOriginal = im; isSketchApplied = false; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; $('goOneClick').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
+  im.onload = () => { img = im; srcOriginal = im; $('srcName').textContent = url + '（' + im.width + '×' + im.height + '）'; go.disabled = false; $('goManual').disabled = false; $('skRun').disabled = false; drawSrcPreview(); drawPvPlaceholder(); pvWrap.style.display = 'block'; $('sightWrap').style.display = 'block'; resetSightLayoutToDefaults(); res([im.width, im.height]); };
   im.src = url;
 });
 window.__run = ov => {
@@ -4945,6 +5446,7 @@ window.__dbg = {
     <button class="s-tool" data-stool="rect" title="拖拽画矩形">矩形</button>
     <button class="s-tool" data-stool="circle" title="拖拽画圆">圆形</button>
     <button class="s-tool" data-stool="fill" title="点击区域做实心填充">填充</button>
+    <button class="s-tool" data-stool="select" title="点选已有笔画进行调整/删除">选择</button>
     <span class="s-sep"></span>
     <label class="s-label">笔刷 <div style="display:flex;align-items:center;gap:4px"><canvas id="studioBrushPrev" width="28" height="28" style="background:#222;border-radius:3px"></canvas><input type="range" id="studioBrushR" min="0.5" max="30" value="2" step="0.5" style="flex:1;min-width:0"><input type="number" id="studioBrush" value="2" min="0.5" max="30" step="0.5" style="width:42px"></div></label>
     <label class="s-label">橡皮 <div style="display:flex;align-items:center;gap:4px"><canvas id="studioEraserPrev" width="28" height="28" style="background:#222;border-radius:3px"></canvas><input type="range" id="studioEraserR" min="1" max="60" value="8" step="1" style="flex:1;min-width:0"><input type="number" id="studioEraser" value="8" min="1" max="60" step="1" style="width:42px"></div></label>
@@ -4952,6 +5454,16 @@ window.__dbg = {
     <button class="s-tool" id="studioUndo" title="撤销 (Ctrl+Z)">撤销</button>
     <button class="s-tool" id="studioRedo" title="重做 (Ctrl+Y)">重做</button>
     <button class="s-tool" id="studioClear" title="清空画布">清空</button>
+    <span class="s-sep"></span>
+    <div class="s-strokes-head">✎ 笔画 <span id="studioStrokeCount">0</span>
+      <button class="s-mini" id="studioStrokeDel" title="删除选中笔画（Delete 键）">删</button>
+    </div>
+    <div class="s-stroke-list" id="studioStrokeList">
+      <div class="s-stroke-empty" id="studioStrokeEmpty">还没有笔画</div>
+    </div>
+    <div class="s-stroke-edit" id="studioStrokeEdit" style="display:none">
+      <span>线宽</span><input type="number" id="studioStrokeLW" min="0.5" max="60" step="0.5">
+    </div>
     <span class="s-sep"></span>
     <button class="s-tool" id="studioZoomOut" title="缩小">－</button>
     <span class="s-zoom" id="studioZoomLabel">100%</span>
@@ -5058,6 +5570,12 @@ const studio = {
   brush: 2, eraser: 8,
   drawing: false, lastP: null,
   history: [], redoStack: [],
+  // 笔画（保留模式）：每个用户笔画是一个对象，可列表选择/调宽/删除
+  // kind: 'pen'|'eraser'|'shape'|'fn'|'fill'|'import'
+  strokes: [], strokeSeq: 0, selectedStroke: null,
+  _curPts: null,         // 当前正在画的笔/橡皮点序列
+  _aiBase: null,         // AI 底图离屏 canvas（冻结后作为笔画重放的底层）
+  _aiBaseActive: false,
   dirty: false,
   hasReference: false,
   refOpacity: 0.35,
@@ -5142,14 +5660,24 @@ function studioInit() {
       }
       return;
     }
+    // 选择工具：命中测试最近笔画，不绘制
+    if (studio.tool === 'select') {
+      ev.preventDefault();
+      const sp = toCanvas(ev);
+      const hit = studioHitStroke(sp.x, sp.y);
+      studioSelectStroke(hit ? hit.id : null);
+      return;
+    }
     ev.preventDefault();
     const p = toCanvas(ev);
     studio.drawing = true;
     studio.lastP = p;
     studioPushHistory();
-    // 画笔/橡皮/填充 → 标记用户已编辑，固化参考底图
-    if (studio.tool === 'pen' || studio.tool === 'eraser' || studio.tool === 'fill') studio._edited = true;
+    // 画笔/橡皮/填充/形状 → 标记用户已编辑，固化参考底图
+    if (studio.tool === 'pen' || studio.tool === 'eraser' || studio.tool === 'fill' ||
+        studio.tool === 'line' || studio.tool === 'rect' || studio.tool === 'circle') studio._edited = true;
     if (studio.tool === 'pen' || studio.tool === 'eraser') {
+      studio._curPts = [p]; // 开始记录这一笔的点序列
       // 单 path 累积笔触：beginPath + moveTo，之后 move 里只 lineTo，rAF 统一 stroke
       const uctx = studio.userCtx;
       // 橡皮擦用 destination-out（让像素变透明），画笔用 source-over
@@ -5170,7 +5698,13 @@ function studioInit() {
       // 立即触发一次 stroke + rebuild，确保落笔有反馈
       strokePendingAndRebuild();
     } else if (studio.tool === 'fill') {
-      studioFloodFill(Math.round(p.x), Math.round(p.y));
+      // 填充记录为一笔（可在列表里删除），渲染时重放 flood fill
+      const fx = Math.round(p.x), fy = Math.round(p.y);
+      studioRenderUser();                 // 先把已有笔画重放干净，再在其上填充
+      studio.strokes.push({ id: ++studio.strokeSeq, kind: 'fill', x: fx, y: fy });
+      studioRenderUser();                 // 重放（含本次填充）
+      rebuildMainCanvas();
+      studioRefreshStrokeList();
     } else if (studio.tool === 'line' || studio.tool === 'rect' || studio.tool === 'circle') {
       studio._start = p;
       studio._userSnap = studio.userCtx.getImageData(0, 0, studio.W, studio.H);
@@ -5344,6 +5878,7 @@ function studioInit() {
     if (studio.tool === 'pen' || studio.tool === 'eraser') {
       // 只 lineTo 累积 path，不 stroke！stroke 在 rAF 里统一执行
       studio.userCtx.lineTo(p.x, p.y);
+      if (studio._curPts) studio._curPts.push(p); // 记录点序列供笔画对象用
       studio._strokePending = true;
       strokePendingAndRebuild();  // rAF 节流
     } else if (studio._preview && studio._start) {
@@ -5365,16 +5900,25 @@ function studioInit() {
     if (studio._strokePending) {
       // 画笔/橡皮：强制 stroke 尾巴，清 path，重建
       studio.userCtx.lineTo(p.x, p.y);  // 最后一个点
+      if (studio._curPts) studio._curPts.push(p);
       strokePendingAndRebuild(true);    // force=true 立即 stroke + rebuild
-    } else if (studio._preview && studio._start) {
-      // 形状：恢复快照 → 画最终版 → 重建
-      if (studio._userSnap) {
-        studio.userCtx.putImageData(studio._userSnap, 0, 0);
-        studio._userSnap = null;
+      // 落库为一笔，随后整层重放（结果与直接画一致，但可被列表管理）
+      if (studio._curPts && studio._curPts.length) {
+        const lw = Math.max(0.5, (studio.tool === 'eraser' ? studio.eraser : studio.brush) * 2);
+        studio.strokes.push({ id: ++studio.strokeSeq, kind: studio.tool, pts: studio._curPts, lw });
+        studio._curPts = null;
+        studioRenderUser();
+        studioRefreshStrokeList();
       }
-      studioDrawShape(studio._start, p, studio.tool, false);
+    } else if (studio._preview && studio._start) {
+      // 形状：提交为一笔（记录 a/b/形状/线宽），整层重放
+      studio._userSnap = null;
+      const lw = Math.max(1, studio.brush);
+      studio.strokes.push({ id: ++studio.strokeSeq, kind: 'shape', shape: studio.tool, a: studio._start, b: p, lw });
       studio._preview = false; studio._start = null;
+      studioRenderUser();
       rebuildMainCanvas();
+      studioRefreshStrokeList();
     }
     studioRedraw();
   };
@@ -5480,6 +6024,17 @@ function studioInit() {
   $('studioUndo').onclick = studioUndo;
   $('studioRedo').onclick = studioRedo;
   $('studioClear').onclick = () => { studioPushHistory(); studioClearCanvas(); studioRedraw(); };
+  // 笔画列表：删除选中 / 调整线宽
+  $('studioStrokeDel').onclick = () => { if (studio.selectedStroke != null) studioDeleteStroke(studio.selectedStroke); };
+  $('studioStrokeLW').onchange = () => {
+    if (studio.selectedStroke == null) return;
+    const s = studio.strokes.find(st => st.id === studio.selectedStroke);
+    const v = parseFloat($('studioStrokeLW').value);
+    if (!s || isNaN(v)) return;
+    studioPushHistory();
+    s.lw = Math.max(0.5, v);
+    studioRenderUser(); rebuildMainCanvas(); studioRefreshStrokeList();
+  };
   // 笔刷 range ↔ number 联动 + 预览
   const updateBrushPrev = () => {
     const cv = $('studioBrushPrev'), ctx = cv.getContext('2d');
@@ -5639,6 +6194,13 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { spaceDown = true; e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); studioUndo(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); studioRedo(); }
+  // Delete/Backspace：删除选中笔画（输入框聚焦时不触发）
+  if ((e.key === 'Delete' || e.key === 'Backspace') && studio.selectedStroke != null) {
+    const t = document.activeElement;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    studioDeleteStroke(studio.selectedStroke);
+  }
 });
 document.addEventListener('keyup', (e) => {
   if (e.code === 'Space') spaceDown = false;
@@ -5646,8 +6208,217 @@ document.addEventListener('keyup', (e) => {
 
 // 清空用户手绘层（保留 refCanvas 不动）——清空按钮调这个
 // userCanvas 必须保持透明背景，否则 drawImage 合成时白色会盖住 refCanvas
+// ===================== 笔画（保留模式）管理 =====================
+// 每个用户笔画都是独立对象，userCanvas 由「AI 底图 + 笔画顺序重放」渲染，
+// 因此可在列表里选中/高亮/调线宽/删除。
+function studioStrokeName(s) {
+  if (s.kind === 'pen') return '✎ 画笔 #' + s.id;
+  if (s.kind === 'eraser') return '⌫ 橡皮 #' + s.id;
+  if (s.kind === 'shape') return (s.shape === 'line' ? '╱ 直线 #' : s.shape === 'rect' ? '▭ 矩形 #' : '◯ 圆形 #') + s.id;
+  if (s.kind === 'fn') return '∿ 曲线 #' + s.id;
+  if (s.kind === 'fill') return '▧ 填充 #' + s.id;
+  if (s.kind === 'import') return '⤓ 导入 (' + (s.segs ? s.segs.length : 0) + ' 段)';
+  return '#' + s.id;
+}
+
+// 沿点序列描线；单点画成实心圆点
+function studioTracePolyline(ctx, pts) {
+  if (!pts || pts.length === 0) return;
+  if (pts.length === 1) {
+    ctx.beginPath();
+    ctx.arc(pts[0].x, pts[0].y, Math.max(0.5, ctx.lineWidth / 2), 0, Math.PI * 2);
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+}
+
+// 重放：清 userCanvas → 画 AI 底图 → 顺序重放所有笔画
+function studioRenderUser() {
+  const ctx = studio.userCtx, W = studio.W, H = studio.H;
+  ctx.save();
+  ctx.globalAlpha = 1; ctx.setLineDash([]);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, W, H);
+  if (studio._aiBaseActive && studio._aiBase) ctx.drawImage(studio._aiBase, 0, 0);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const s of studio.strokes) {
+    if (s.kind === 'pen') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = STUDIO_INK; ctx.lineWidth = s.lw;
+      studioTracePolyline(ctx, s.pts);
+    } else if (s.kind === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = '#000000'; ctx.lineWidth = s.lw;
+      studioTracePolyline(ctx, s.pts);
+    } else if (s.kind === 'shape') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = STUDIO_INK; ctx.lineWidth = s.lw;
+      const a = s.a, b = s.b;
+      ctx.beginPath();
+      if (s.shape === 'line') { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      else if (s.shape === 'rect') { ctx.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)); }
+      else if (s.shape === 'circle') { const r = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)); ctx.arc(a.x, a.y, r, 0, Math.PI * 2); ctx.stroke(); }
+    } else if (s.kind === 'fn') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = STUDIO_INK; ctx.lineWidth = s.lw;
+      for (const g of s.groups) {
+        if (!g || g.length < 2) continue;
+        ctx.beginPath();
+        for (let i = 0; i < g.length; i++) { if (i === 0) ctx.moveTo(g[i].x, g[i].y); else ctx.lineTo(g[i].x, g[i].y); }
+        if (s.close && g.length > 2) ctx.closePath();
+        ctx.stroke();
+      }
+    } else if (s.kind === 'import') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = STUDIO_INK; ctx.lineWidth = s.lw;
+      ctx.beginPath();
+      for (const seg of s.segs) { ctx.moveTo(seg[0].x, seg[0].y); ctx.lineTo(seg[1].x, seg[1].y); }
+      ctx.stroke();
+    } else if (s.kind === 'fill') {
+      ctx.globalCompositeOperation = 'source-over';
+      studioFloodFill(s.x, s.y, true); // 静默重放
+    }
+  }
+  ctx.restore();
+}
+
+// 点到线段距离
+function studioDistSeg(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t * dx, cy = ay + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+// 命中测试：返回离 (x,y) 最近且在阈值内的笔画
+function studioHitStroke(x, y) {
+  let best = null, bestD = 14 / Math.max(0.25, studio.zoom); // 屏幕 14px → canvas
+  const consider = (d) => { if (d < bestD) { bestD = d; return true; } return false; };
+  for (let i = studio.strokes.length - 1; i >= 0; i--) {
+    const s = studio.strokes[i];
+    const tol = (s.lw ? s.lw / 2 : 4) + 10 / Math.max(0.25, studio.zoom);
+    if (s.kind === 'pen' || s.kind === 'eraser') {
+      for (let j = 0; j + 1 < s.pts.length; j++) {
+        const d = studioDistSeg(x, y, s.pts[j].x, s.pts[j].y, s.pts[j + 1].x, s.pts[j + 1].y);
+        if (d < tol && consider(d)) best = s;
+      }
+    } else if (s.kind === 'shape') {
+      if (s.shape === 'line') { const d = studioDistSeg(x, y, s.a.x, s.a.y, s.b.x, s.b.y); if (d < tol && consider(d)) best = s; }
+      else if (s.shape === 'rect') {
+        const x0 = Math.min(s.a.x, s.b.x), x1 = Math.max(s.a.x, s.b.x), y0 = Math.min(s.a.y, s.b.y), y1 = Math.max(s.a.y, s.b.y);
+        const d = Math.min(studioDistSeg(x, y, x0, y0, x1, y0), studioDistSeg(x, y, x0, y1, x1, y1),
+                           studioDistSeg(x, y, x0, y0, x0, y1), studioDistSeg(x, y, x1, y0, x1, y1));
+        if (d < tol && consider(d)) best = s;
+      } else {
+        const r = Math.max(1, Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y));
+        const d = Math.abs(Math.hypot(x - s.a.x, y - s.a.y) - r);
+        if (d < tol && consider(d)) best = s;
+      }
+    } else if (s.kind === 'fn') {
+      for (const g of s.groups) for (let j = 0; g && j + 1 < g.length; j++) {
+        const d = studioDistSeg(x, y, g[j].x, g[j].y, g[j + 1].x, g[j + 1].y);
+        if (d < tol && consider(d)) best = s;
+      }
+    } else if (s.kind === 'import') {
+      for (const seg of s.segs) { const d = studioDistSeg(x, y, seg[0].x, seg[0].y, seg[1].x, seg[1].y); if (d < tol && consider(d)) best = s; }
+    } else if (s.kind === 'fill') {
+      const d = Math.hypot(x - s.x, y - s.y);
+      if (d < 14 / Math.max(0.25, studio.zoom) && consider(d)) best = s;
+    }
+  }
+  return best;
+}
+
+// 选中笔画的高亮（画在主 canvas 上，不污染 userCanvas / 导出）
+function studioDrawStrokeHighlight(ctx, s) {
+  ctx.save();
+  ctx.globalAlpha = 1; ctx.setLineDash([7, 5]);
+  ctx.strokeStyle = '#ff5a00'; ctx.fillStyle = '#ff5a00';
+  ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const dot = (p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); };
+  if (s.kind === 'pen' || s.kind === 'eraser') {
+    if (s.pts.length > 1) { ctx.beginPath(); ctx.moveTo(s.pts[0].x, s.pts[0].y); for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i].x, s.pts[i].y); ctx.stroke(); }
+    dot(s.pts[0]); if (s.pts.length > 1) dot(s.pts[s.pts.length - 1]);
+  } else if (s.kind === 'shape') {
+    ctx.beginPath();
+    if (s.shape === 'line') { ctx.moveTo(s.a.x, s.a.y); ctx.lineTo(s.b.x, s.b.y); }
+    else if (s.shape === 'rect') { const x = Math.min(s.a.x, s.b.x), y = Math.min(s.a.y, s.b.y); ctx.rect(x, y, Math.abs(s.b.x - s.a.x), Math.abs(s.b.y - s.a.y)); }
+    else { const r = Math.max(1, Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y)); ctx.arc(s.a.x, s.a.y, r, 0, Math.PI * 2); }
+    ctx.stroke();
+  } else if (s.kind === 'fn') {
+    for (const g of s.groups) { if (!g || g.length < 2) continue; ctx.beginPath(); ctx.moveTo(g[0].x, g[0].y); for (let i = 1; i < g.length; i++) ctx.lineTo(g[i].x, g[i].y); ctx.stroke(); }
+  } else if (s.kind === 'import') {
+    ctx.beginPath(); for (const seg of s.segs) { ctx.moveTo(seg[0].x, seg[0].y); ctx.lineTo(seg[1].x, seg[1].y); } ctx.stroke();
+  } else if (s.kind === 'fill') {
+    ctx.setLineDash([]); ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, Math.PI * 2); ctx.stroke(); dot({ x: s.x, y: s.y });
+  }
+  ctx.restore();
+}
+
+function studioCloneStrokes(arr) {
+  return arr.map(s => {
+    const c = Object.assign({}, s);
+    if (s.pts) c.pts = s.pts.slice();
+    if (s.groups) c.groups = s.groups.map(g => g.slice());
+    if (s.segs) c.segs = s.segs.slice();
+    return c;
+  });
+}
+
+function studioRefreshStrokeList() {
+  const list = $('studioStrokeList');
+  if (!list) return;
+  $('studioStrokeCount').textContent = studio.strokes.length;
+  list.innerHTML = '';
+  if (!studio.strokes.length) {
+    list.innerHTML = '<div class="s-stroke-empty">还没有笔画</div>';
+    $('studioStrokeEdit').style.display = 'none';
+    return;
+  }
+  for (const s of studio.strokes) {
+    const row = document.createElement('div');
+    row.className = 's-stroke-row' + (s.id === studio.selectedStroke ? ' sel' : '');
+    const name = document.createElement('span'); name.className = 'sr-name'; name.textContent = studioStrokeName(s);
+    const x = document.createElement('span'); x.className = 'sr-x'; x.textContent = '×'; x.title = '删除这一笔';
+    x.onclick = (e) => { e.stopPropagation(); studioDeleteStroke(s.id); };
+    row.appendChild(name); row.appendChild(x);
+    row.onclick = () => studioSelectStroke(s.id);
+    list.appendChild(row);
+  }
+  const sel = studio.strokes.find(s => s.id === studio.selectedStroke);
+  const editEl = $('studioStrokeEdit');
+  if (sel && 'lw' in sel) { editEl.style.display = 'flex'; $('studioStrokeLW').value = sel.lw; }
+  else editEl.style.display = 'none';
+}
+
+function studioSelectStroke(id) {
+  studio.selectedStroke = id;
+  rebuildMainCanvas();
+  studioRefreshStrokeList();
+}
+
+function studioDeleteStroke(id) {
+  studioPushHistory();
+  studio.strokes = studio.strokes.filter(s => s.id !== id);
+  if (studio.selectedStroke === id) studio.selectedStroke = null;
+  studioRenderUser();
+  rebuildMainCanvas();
+  studioRefreshStrokeList();
+}
+
 function studioClearCanvas() {
+  studio.strokes = [];
+  studio.selectedStroke = null;
+  studio._aiBaseActive = false;
   studio.userCtx.clearRect(0, 0, studio.W, studio.H);
+  studioRefreshStrokeList();
   rebuildMainCanvas();
 }
 
@@ -5659,6 +6430,11 @@ function rebuildMainCanvas() {
   ctx.fillRect(0, 0, studio.W, studio.H);
   if (studio.refCanvas) ctx.drawImage(studio.refCanvas, 0, 0);
   if (studio.userCanvas) ctx.drawImage(studio.userCanvas, 0, 0);
+  // 选中笔画高亮（仅显示，不写入 userCanvas/导出）
+  if (studio.selectedStroke != null) {
+    const s = studio.strokes.find(st => st.id === studio.selectedStroke);
+    if (s) studioDrawStrokeHighlight(ctx, s);
+  }
   // 橙色包围框提示（仅 transform 模式）
   if (studio.transformMode) {
     const mode = $('studioRefMode').value;
@@ -5750,7 +6526,7 @@ function studioDrawShape(a, b, tool, preview) {
 // flood fill：只对 userCanvas（透明底 + stroke 黑 + 灰色抗锯齿）操作
 // 抗锯齿策略：开头先把所有灰色 stroke 边缘设为纯黑（预处理），后续在干净二值图上运行
 // 结束前再扫一遍兜底（预处理可能漏极端值）
-function studioFloodFill(x, y) {
+function studioFloodFill(x, y, silent) {
   x = Math.round(x); y = Math.round(y);
   const ctx = studio.userCtx;
   const img = ctx.getImageData(0, 0, studio.W, studio.H);
@@ -5839,9 +6615,11 @@ function studioFloodFill(x, y) {
   }
 
   ctx.putImageData(img, 0, 0);
-  rebuildMainCanvas();
-  const totalEdge = preEdgeCount + finalEdgeCount;
-  setStatus('填充完成: ' + fillCount + ' 像素' + (totalEdge ? ' + 边缘 '+totalEdge : ''), 'ok');
+  if (!silent) {
+    rebuildMainCanvas();
+    const totalEdge = preEdgeCount + finalEdgeCount;
+    setStatus('填充完成: ' + fillCount + ' 像素' + (totalEdge ? ' + 边缘 '+totalEdge : ''), 'ok');
+  }
 }
 
 // 快速估算连通非墨水区域大小（带上限，避免整块白色画布 BFS 太慢）
@@ -5930,65 +6708,149 @@ function studioFnDraw() {
     }
   }
 
-  // 画 polyline 到 userCanvas（分段处理，null 为断点）
+  // 记录为一笔 fn 曲线（按 null 断点拆成多段），整层重放
   studioPushHistory();
-  const ctx = studio.userCtx;
-  ctx.save();
-  ctx.globalCompositeOperation = 'source-over'; // 显式恢复，避免橡皮擦残留 destination-out
-  ctx.strokeStyle = STUDIO_INK;
-  ctx.lineWidth = lw;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  let started = false, first = null, prev = null;
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    if (p === null) {
-      started = false;
-      prev = null;
-      continue;
-    }
-    if (!started) {
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      first = p;
-      started = true;
-    } else {
-      ctx.lineTo(p.x, p.y);
-    }
-    prev = p;
+  studio._edited = true;
+  const groups = [];
+  let cur = [];
+  for (const p of pts) {
+    if (p === null) { if (cur.length) groups.push(cur); cur = []; }
+    else cur.push(p);
   }
-  if (close && first && prev) {
-    ctx.lineTo(first.x, first.y);
-  }
-  ctx.stroke();
-  ctx.restore();
+  if (cur.length) groups.push(cur);
+  studio.strokes.push({ id: ++studio.strokeSeq, kind: 'fn', groups, lw, close: !!close });
+  studioRenderUser();
   rebuildMainCanvas();
+  studioRefreshStrokeList();
   const validPts = pts.filter(p => p !== null).length;
-  setStatus('函数作图完成: ' + validPts + '/' + samples + ' 采样点 → 已画到画布（Ctrl+Z 可撤销）', 'ok');
+  setStatus('函数作图完成: ' + validPts + '/' + samples + ' 采样点 → 已作为一笔记录（可在笔画列表删除）', 'ok');
 }
 
-// 历史栈：直接存 userCanvas 的 ImageData（三层架构下 userCanvas 就是纯净的用户层，无需 destination-out 魔法）
+// ============ AI 自动描边：把 AI 线稿精确转成可编辑笔画 ============
+// 复用 convert() 的骨架化+路径追踪管线，专门用 trace 模式参数（minLen=1, dpEps=0.2, 精细路径不丢失）
+// convert 内部会同时生成：
+//   o._rawPaths = 精细路径（不 filter minLen，dpEps=0.2） ← studioAutoTrace 用这个
+//   o._polylines = .blk 优化路径（filter minLen，dpEps=autoEps） ← .blk 导出用这个
+async function studioAutoTrace() {
+  if (!img) { setStatus('请先上传图片并点「AI 转线稿」', 'err'); return; }
+
+  setStatus('AI 自动描边：骨架化 + 路径追踪中…', 'busy');
+  await new Promise(r => setTimeout(r, 30));
+
+  // 保存主页面的 lastBlk，避免 convert() 覆盖主瞄具
+  const savedBlk = lastBlk;
+  const savedTraceBlk = lastTraceBlk;
+  let rawPaths, GW, GH, o;
+
+  try {
+    const cL = Math.min(num('cL'), num('cR')), cT = Math.min(num('cT'), num('cB'));
+    const cR = Math.max(num('cL'), num('cR')), cB = Math.max(num('cT'), num('cB'));
+    const auto = autoTuneFromImage(img, cL, cT, cR, cB);
+    const r = resolveOptions(img, auto);
+    convert(r.o);
+    o = lastOpts;
+    GW = o.GW; GH = o.GH;
+    rawPaths = o._rawPaths;
+  } catch (e) {
+    lastBlk = savedBlk; lastTraceBlk = savedTraceBlk;
+    setStatus('AI 自动描边失败：' + e.message, 'err');
+    console.error(e);
+    return;
+  } finally {
+    // 恢复主页面的 .blk，保证主瞄具不被 studio 的 convert 覆盖
+    lastBlk = savedBlk; lastTraceBlk = savedTraceBlk;
+  }
+
+  if (!rawPaths || !rawPaths.length) {
+    setStatus('线稿分析完成，但没找到可描的黑线（可能图像太暗/太白）', 'err');
+    return;
+  }
+
+  // 清空旧笔画（多次点不累积）
+  studio.strokes = [];
+
+  // 构造 grid → blk → canvas 的坐标转换（与 blkToCanvas 保持一致）
+  const x0 = o.x0, y0 = o.y0, w = o.w;
+  const artH = w * (GH / GW);
+  const gridToCanvas = (gx, gy) => {
+    // grid → blk 坐标
+    const bx = x0 + (gx / GW) * w;
+    const by = y0 * Y_BLK_SCALE + (gy / GH) * artH;
+    // blk → canvas（与 blkToCanvas 公式完全一致）
+    return {
+      x: (bx + 0.5) * studio.W,
+      y: ((by + WT_Y_CENTER) / Y_BLK_SCALE) * studio.H,
+    };
+  };
+
+  studioPushHistory(); // 入历史，方便撤销
+
+  // 每条 rawPath 直接成笔——不做任何合并，解除所有上限
+  // t1 没 pruneSpurs/stitchEnds，每条骨架线都是独立的一笔
+  let strokeCount = 0;
+  for (const path of rawPaths) {
+    if (path.length < 2) continue;
+    const pts = path.map(([gx, gy]) => gridToCanvas(gx, gy));
+    studio.strokes.push({
+      id: ++studio.strokeSeq,
+      kind: 'fn',
+      groups: [pts],
+      lw: 1.0,
+      close: false,
+    });
+    strokeCount++;
+  }
+
+  // 也把 .blk 正常分支的填充块轮廓作为描边（让填色区域也有轮廓线）
+  const fillPls = o._polylines.filter(pl => pl.fill && pl.p && pl.p.length >= 3);
+  for (const pl of fillPls) {
+    const pts = pl.p.map(([gx, gy]) => gridToCanvas(gx, gy));
+    studio.strokes.push({
+      id: ++studio.strokeSeq,
+      kind: 'fn',
+      groups: [pts],
+      lw: 0.6,
+      close: true,
+    });
+    strokeCount++;
+  }
+
+  studio._edited = true;
+  studioRenderUser();
+  rebuildMainCanvas();
+  studioRefreshStrokeList();
+
+  setStatus('AI 自动描边完成：' + strokeCount + ' 笔（全量骨架 ' + rawPaths.length + ' + 填块轮廓 ' + fillPls.length + '），可在画布编辑', 'ok');
+}
+// AI 自动描边 END
+
+// 历史栈：存笔画数组快照（保留模式下撤销/重做 = 恢复笔画列表后重放）
 function studioPushHistory() {
-  const snap = studio.userCtx.getImageData(0, 0, studio.W, studio.H);
-  studio.history.push(snap);
+  studio.history.push({ strokes: studioCloneStrokes(studio.strokes), ai: studio._aiBaseActive });
   if (studio.history.length > 30) studio.history.shift();
   studio.redoStack.length = 0;
 }
 function studioUndo() {
   if (studio.history.length === 0) return;
-  const cur = studio.userCtx.getImageData(0, 0, studio.W, studio.H);
-  studio.redoStack.push(cur);
+  studio.redoStack.push({ strokes: studioCloneStrokes(studio.strokes), ai: studio._aiBaseActive });
   const prev = studio.history.pop();
-  studio.userCtx.putImageData(prev, 0, 0);
+  studio.strokes = prev.strokes;
+  studio._aiBaseActive = prev.ai;
+  studio.selectedStroke = null;
+  studioRenderUser();
   rebuildMainCanvas();
+  studioRefreshStrokeList();
 }
 function studioRedo() {
   if (studio.redoStack.length === 0) return;
-  const cur = studio.userCtx.getImageData(0, 0, studio.W, studio.H);
-  studio.history.push(cur);
+  studio.history.push({ strokes: studioCloneStrokes(studio.strokes), ai: studio._aiBaseActive });
   const nxt = studio.redoStack.pop();
-  studio.userCtx.putImageData(nxt, 0, 0);
+  studio.strokes = nxt.strokes;
+  studio._aiBaseActive = nxt.ai;
+  studio.selectedStroke = null;
+  studioRenderUser();
   rebuildMainCanvas();
+  studioRefreshStrokeList();
 }
 
 function studioShow() {
@@ -5997,11 +6859,14 @@ function studioShow() {
   studio._aiDrawn = false; // 清除 AI 线稿已写入 userCanvas 的标记，让 studioLoadReference 重新画
   studio.userCtx.clearRect(0, 0, studio.W, studio.H); // 清空 userCanvas，准备接收新的 AI 线稿 + 用户手绘
   studio.history.length = 0; studio.redoStack.length = 0; // 清空撤销栈
+  studio.strokes = []; studio.strokeSeq = 0; studio.selectedStroke = null; // 清空笔画列表
+  studio._aiBaseActive = false;
+  studioRefreshStrokeList();
   // 进入时用 lastOpts 初始化坐标面板
   studioInitRefFromOpts();
   setTimeout(() => {
     studioFit();
-    studioLoadReference();  // 只更新 refCanvas
+    studioLoadReference();  // 重画 refCanvas + 同步 AI 底图
     rebuildMainCanvas();   // 重建主 canvas（白底+refCanvas，首次打开无用户手绘）
   }, 50);
 }
@@ -6062,6 +6927,7 @@ function studioLoadReference() {
   if (!studio._edited) {
     studio.userCtx.clearRect(0, 0, studio.W, studio.H);
     studio._aiDrawn = false;
+    studio._aiBaseActive = false; // AI 底图待 gen 块重新同步
   }
   // blk 坐标 → 画布像素（参考层和用户层共用同一套公式）
   const b2p = (bx, by) => ({
@@ -6095,37 +6961,65 @@ function studioLoadReference() {
       uctx.save();
       uctx.globalCompositeOperation = 'source-over';
       uctx.strokeStyle = '#000000';
-      uctx.lineWidth = 1.5;
       uctx.lineCap = 'round';
       uctx.lineJoin = 'round';
       uctx.imageSmoothingEnabled = false;
-      for (const pl of lastOpts._polylines) {
-        const pts = pl.p;
-        if (!pts || pts.length < 2) continue;
-        uctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const bx = rx0 + pts[i][0] / o.GW * rw + WT_X_OFFSET;
-          const by = ry0 * Y_BLK_SCALE + (pts[i][1] / o.GH) * artH - WT_Y_CENTER;
-          const p = b2p(bx, by);
-          if (i === 0) uctx.moveTo(p.x, p.y); else uctx.lineTo(p.x, p.y);
+      const genMode = $('genMode')?.value || 'trace';
+      if (genMode === 'trace' && o._rawPaths?.length) {
+        // AI 自动描边模式：画压缩后路径（和 .blk 一致）
+        const compressed = getCompressedPaths(o);
+        uctx.lineWidth = 1.0;
+        for (const cp of compressed) {
+          if (cp.pts.length < 2) continue;
+          uctx.beginPath();
+          for (let i = 0; i < cp.pts.length; i++) {
+            const bx = rx0 + cp.pts[i][0] / o.GW * rw + WT_X_OFFSET;
+            const by = ry0 * Y_BLK_SCALE + (cp.pts[i][1] / o.GH) * artH - WT_Y_CENTER;
+            const p = b2p(bx, by);
+            if (i === 0) uctx.moveTo(p.x, p.y); else uctx.lineTo(p.x, p.y);
+          }
+          uctx.stroke();
         }
-        if (pl.closed) uctx.closePath();
-        uctx.stroke();
-      }
-      uctx.strokeStyle = '#000000';
-      uctx.lineWidth = 1;
-      for (const pl of lastOpts._polylines) {
-        if (!pl.fill) continue;
-        const s = pl.p;
-        const ax = rx0 + s[0][0] / o.GW * rw + WT_X_OFFSET;
-        const ay = ry0 * Y_BLK_SCALE + (s[0][1] / o.GH) * artH - WT_Y_CENTER;
-        const bx = rx0 + s[1][0] / o.GW * rw + WT_X_OFFSET;
-        const by = ry0 * Y_BLK_SCALE + (s[1][1] / o.GH) * artH - WT_Y_CENTER;
-        const pa = b2p(ax, ay), pb = b2p(bx, by);
-        uctx.beginPath(); uctx.moveTo(pa.x, pa.y); uctx.lineTo(pb.x, pb.y); uctx.stroke();
+      } else {
+        // 标准模式：_polylines 填充 + 轮廓
+        uctx.lineWidth = 1.5;
+        for (const pl of o._polylines) {
+          const pts = pl.p;
+          if (!pts || pts.length < 2) continue;
+          uctx.beginPath();
+          for (let i = 0; i < pts.length; i++) {
+            const bx = rx0 + pts[i][0] / o.GW * rw + WT_X_OFFSET;
+            const by = ry0 * Y_BLK_SCALE + (pts[i][1] / o.GH) * artH - WT_Y_CENTER;
+            const p = b2p(bx, by);
+            if (i === 0) uctx.moveTo(p.x, p.y); else uctx.lineTo(p.x, p.y);
+          }
+          if (pl.closed) uctx.closePath();
+          uctx.stroke();
+        }
+        uctx.strokeStyle = '#000000';
+        uctx.lineWidth = 1;
+        for (const pl of o._polylines) {
+          if (!pl.fill) continue;
+          const s = pl.p;
+          const ax = rx0 + s[0][0] / o.GW * rw + WT_X_OFFSET;
+          const ay = ry0 * Y_BLK_SCALE + (s[0][1] / o.GH) * artH - WT_Y_CENTER;
+          const bx = rx0 + s[1][0] / o.GW * rw + WT_X_OFFSET;
+          const by = ry0 * Y_BLK_SCALE + (s[1][1] / o.GH) * artH - WT_Y_CENTER;
+          const pa = b2p(ax, ay), pb = b2p(bx, by);
+          uctx.beginPath(); uctx.moveTo(pa.x, pa.y); uctx.lineTo(pb.x, pb.y); uctx.stroke();
+        }
       }
       uctx.restore();
       studio._aiDrawn = true;
+      // 同步 AI 底图（此时 userCanvas 只有刚画的 AI 线稿），供保留模式笔画重放
+      if (!studio._aiBase) {
+        studio._aiBase = document.createElement('canvas');
+        studio._aiBase.width = studio.W; studio._aiBase.height = studio.H;
+      }
+      const bctx = studio._aiBase.getContext('2d');
+      bctx.clearRect(0, 0, studio.W, studio.H);
+      bctx.drawImage(studio.userCanvas, 0, 0);
+      studio._aiBaseActive = true;
     }
   }
 
@@ -6154,24 +7048,27 @@ function studioLoadReference() {
 
 // 导入手动层到工作台（把 manualState.lines 光栅化到 userCanvas）
 function studioImportManual() {
+  if (!manualState.lines.length) { setStatus('手动层没有可导入的线条', 'err'); return; }
   studioPushHistory();
-  const ctx = studio.userCtx;
-  ctx.strokeStyle = STUDIO_INK;
-  ctx.lineWidth = Math.max(1, +$('manualLW').value || 1.5);
-  ctx.lineCap = 'round';
+  studio._edited = true;
+  const lw = Math.max(1, +$('manualLW').value || 1.5);
+  const segs = [];
   for (const L of manualState.lines) {
     const x1 = (L.x1 + 0.5) * studio.W;
     const y1 = ((L.y1 + WT_Y_CENTER) / Y_BLK_SCALE) * studio.H;
     const x2 = (L.x2 + 0.5) * studio.W;
     const y2 = ((L.y2 + WT_Y_CENTER) / Y_BLK_SCALE) * studio.H;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    segs.push([{ x: x1, y: y1 }, { x: x2, y: y2 }]);
   }
+  studio.strokes.push({ id: ++studio.strokeSeq, kind: 'import', segs, lw });
+  studioRenderUser();
   rebuildMainCanvas();
-  setStatus('已导入 ' + manualState.lines.length + ' 条手动线到工作台', 'ok');
+  studioRefreshStrokeList();
+  setStatus('已导入 ' + manualState.lines.length + ' 条手动线到工作台（作为一笔，可在列表删除）', 'ok');
 }
 
 // ============ 导入 .blk → 手动层继续编辑 ============
-// 解析 line {line:p4=X1,Y1,X2,Y2; move:b=false;} 与 text{text="…"; position:p2=X,Y; size=S; …}
+// 解析 line {line:p4=X1,Y1,X2,Y2; move:b=true;} 与 text{text="…"; position:p2=X,Y; size=S; …}
 // 坐标已是 blk 空间，直接并入 manualState（可撤销）；工作台开着则同步光栅化到画布
 function importBlkText(text, srcName) {
   const lineRe = /line\s*\{\s*line\s*:\s*p4\s*=\s*(-?[\d.eE+]+)\s*,\s*(-?[\d.eE+]+)\s*,\s*(-?[\d.eE+]+)\s*,\s*(-?[\d.eE+]+)/g;
@@ -6219,6 +7116,8 @@ $('blkImportFile').onchange = (e) => {
 
 // 从工作台画布提取像素→转换为 line 段（准心在 CSS overlay，不在像素里，直接提取）
 function studioExportToManual() {
+  // 导出前取消选中并重建，确保橙色高亮不被当作墨水导出
+  if (studio.selectedStroke != null) { studio.selectedStroke = null; rebuildMainCanvas(); studioRefreshStrokeList(); }
   const ctx = studio.ctx;
   const img = ctx.getImageData(0, 0, studio.W, studio.H);
   const data = img.data;
@@ -6250,18 +7149,358 @@ function studioExportToManual() {
   setStatus('工作台已应用：' + newLines.length + ' 条扫描线导入手动层', 'ok');
 }
 
-// 从工作台直接导出 .blk
+// 从工作台直接导出 .blk —— 矢量直出版（v2.7）
+// 手绘笔画：studio.strokes 本来就是矢量点序列 → 直接映射输出（天然连续、数据量小、不扫描！）
+// AI 底图：像素 → 骨架化路径追踪（和主 trace 同管线）
+// 两路合并后走 buildCompactBlkFromBlkPaths 字节预算闭环（≤820KB，绝不砍尾=不砍腿）
 function studioExportBlk() {
-  studioExportToManual();
-  const blk = generateManualOnlyBlk();
-  if (!blk) return;
-  const blob = new Blob([blk], { type: 'application/octet-stream' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'studio_sight.blk';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  studioHide();
+  // 导出前取消选中并重建，确保橙色高亮不被当作墨水导出
+  if (studio.selectedStroke != null) { studio.selectedStroke = null; rebuildMainCanvas(); studioRefreshStrokeList(); }
+
+  setStatus('工作台导出：矢量笔画直出…', 'busy');
+  setTimeout(() => {
+    try {
+      const W = studio.W, H = studio.H;
+      // canvas 像素 → WT blk 坐标（studio canvas 是 WT 屏幕 1:1 像素，无需 sight box 二次映射！）
+      // studioLoadReference 已经把 AI 线稿通过 sight box 映射到 WT 屏幕坐标，
+      // 手绘笔画也是直接画在 WT 屏幕 1:1 的 canvas 上，所以 canvas 像素 = WT 屏幕像素
+      const toBlk = (cx, cy) => {
+        const bx = cx / W - 0.5;
+        const by = cy / H * Y_BLK_SCALE - WT_Y_CENTER;
+        return [bx, by];
+      };
+      const avgYof = (pts) => pts.reduce((s, p) => s + p[1], 0) / Math.max(1, pts.length);
+      const paths = [];
+      let strokeCount = 0;
+
+      // === 1) 矢量笔画直出 ===
+      for (const s of studio.strokes) {
+        if (s.kind === 'pen') {
+          if (!s.pts || s.pts.length < 2) continue;
+          let pts = s.pts.map(p => toBlk(p.x, p.y));
+          pts = chaikinOpen(pts, 1); // 轻微平滑手绘抖动
+          paths.push({ pts, avgY: avgYof(pts) });
+          strokeCount++;
+        } else if (s.kind === 'shape') {
+          const a = s.a, b = s.b;
+          let pts = [];
+          if (s.shape === 'line') {
+            pts = [toBlk(a.x, a.y), toBlk(b.x, b.y)];
+          } else if (s.shape === 'rect') {
+            const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+            pts = [toBlk(x0, y0), toBlk(x1, y0), toBlk(x1, y1), toBlk(x0, y1), toBlk(x0, y0)];
+          } else if (s.shape === 'circle') {
+            const r = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+            const N = 40;
+            for (let i = 0; i <= N; i++) {
+              const ang = (i / N) * Math.PI * 2;
+              pts.push(toBlk(a.x + Math.cos(ang) * r, a.y + Math.sin(ang) * r));
+            }
+          }
+          if (pts.length >= 2) { paths.push({ pts, avgY: avgYof(pts) }); strokeCount++; }
+        } else if (s.kind === 'fn') {
+          for (const g of (s.groups || [])) {
+            if (!g || g.length < 2) continue;
+            let pts = g.map(p => toBlk(p.x, p.y));
+            if (s.close && pts.length > 2) pts.push(pts[0].slice());
+            paths.push({ pts, avgY: avgYof(pts) });
+            strokeCount++;
+          }
+        } else if (s.kind === 'import') {
+          for (const seg of (s.segs || [])) {
+            const pts = [toBlk(seg[0].x, seg[0].y), toBlk(seg[1].x, seg[1].y)];
+            paths.push({ pts, avgY: avgYof(pts) });
+          }
+          strokeCount++;
+        }
+        // eraser（擦除）/ fill（填充）不导出
+      }
+      console.log('[studioExport] vector strokes=' + strokeCount + ' paths=' + paths.length);
+
+      // === 2) AI 底图 → 逐行扫描墨水 mask（和主页 buildOutlineBlk 一致，不丢线）===
+      if (studio._aiBaseActive && studio._aiBase) {
+        // 直接用 studio canvas 原分辨率扫描（WT 屏幕 1:1 像素），不降采样
+        const GW = W, GH = H;
+        const tmp = document.createElement('canvas');
+        tmp.width = GW; tmp.height = GH;
+        const tctx = tmp.getContext('2d');
+        tctx.imageSmoothingEnabled = false;
+        tctx.drawImage(studio._aiBase, 0, 0, GW, GH);
+        const img = tctx.getImageData(0, 0, GW, GH);
+        const data = img.data;
+        // 提取墨水 mask（放宽 alpha 和颜色阈值，覆盖抗锯齿像素）
+        const inkD = new Uint8Array(GW * GH);
+        for (let i = 0; i < GW * GH; i++) {
+          if (data[i * 4 + 3] > 30 && data[i * 4] < 180 && data[i * 4 + 1] < 180 && data[i * 4 + 2] < 180) inkD[i] = 1;
+        }
+        // 逐行扫描，每行找连续墨水 run → 水平线段
+        let segFromInk = 0;
+        for (let y = 0; y < GH; y++) {
+          const rowOff = y * GW;
+          let x = 0;
+          while (x < GW) {
+            while (x < GW && !inkD[rowOff + x]) x++;
+            if (x >= GW) break;
+            const x0 = x;
+            while (x < GW && inkD[rowOff + x]) x++;
+            const x1 = x - 1;
+            const runCols = x1 - x0 + 1;
+            if (runCols < 2) continue; // 只过滤单像素噪点（和 buildOutlineBlk 阈值一致）
+            // grid 像素 → WT blk 坐标
+            const bx0 = x0 / GW - 0.5;
+            const bx1 = x1 / GW - 0.5;
+            const by = y / GH * Y_BLK_SCALE - WT_Y_CENTER;
+            paths.push({ pts: [[bx0, by], [bx1, by]], avgY: by });
+            segFromInk++;
+          }
+        }
+        console.log('[studioExport] AI base: row-scan segs=' + segFromInk + ' (grid ' + GW + 'x' + GH + ')');
+      }
+
+      if (!paths.length) {
+        setStatus('工作台导出失败：画布上没有可导出的笔画/线稿', 'err');
+        return;
+      }
+
+      // === 3) 根据 genMode 选择输出格式 ===
+      const curMode = $('genMode')?.value || 'trace';
+      const sightWBlk = sight.w || 0.5;
+      const oHdr = {
+        x0: sight.x0 || (1 - sightWBlk) / 2, y0: sight.y0 || 0, w: sightWBlk,
+        GW: 1000, GH: 1000, artH: sightWBlk,
+        cross: ($('cross')?.checked ?? true), mark: '',
+        fillStrength: 0, lines: '',
+      };
+      let blk = '', segCount = 0, pathCount = 0;
+
+      if (curMode === 'outline') {
+        // === 经典模式（wiki 格式 + move:b=false，和 obstest2studio_sight.blk / reisen_sight_12.blk 完全一致）===
+        const F5 = (v) => { let s = v.toFixed(5); s = s.replace(/\.?0+$/, ''); return s; };
+        const L = blkHeader(oHdr);
+        L.push('drawLines{');
+        let segStrs = '';
+        pathCount = paths.length;
+        for (const p of paths) {
+          const pts = p.pts;
+          for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i], b = pts[i + 1];
+            if (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9) continue;
+            segStrs += '  line {line:p4=' + F5(a[0]) + ',' + F5(a[1]) + ',' + F5(b[0]) + ',' + F5(b[1]) + '; move:b=false;}\n';
+            segCount++;
+          }
+        }
+        L.push(segStrs);
+        L.push('}');
+        blk = L.join('\n');
+        console.log('[studioExport] OUTLINE mode paths=' + pathCount + ' segs=' + segCount + ' bytes=' + blk.length);
+      } else {
+        // === 描边模式（紧凑格式 + move:b=true，两天前 studioCanvasToBlk 风格）===
+        const L = blkHeader(oHdr);
+        const r = buildCompactBlkFromBlkPaths(paths, L, BLK_SIZE_LIMIT - 4096);
+        blk = r.raw;
+        segCount = r.segCount;
+        pathCount = r.pathCount;
+        console.log('[studioExport] TRACE mode paths=' + pathCount + ' segs=' + segCount + ' bytes=' + blk.length + '/' + BLK_SIZE_LIMIT + (r.trimmed ? ' [greedy-pruned]' : ''));
+      }
+
+      if (!blk || segCount === 0) {
+        setStatus('工作台导出失败：压缩后无有效段', 'err');
+        return;
+      }
+      if (blk.length > BLK_SIZE_LIMIT) {
+        blk = trimBlkToSize(blk, BLK_SIZE_LIMIT).str;
+      }
+
+      // === 4) 下载 ===
+      const blob = new Blob([blk], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const ts = Date.now().toString().slice(-6);
+      const modeTag = curMode === 'outline' ? 'outline' : 'trace';
+      a.download = 'final_' + ts + '_studio_sight_' + modeTag + '.blk';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      setStatus('工作台导出成功：' + strokeCount + ' 笔矢量 + AI 线稿 → ' + segCount + ' 段 / ' + blk.length + ' B（' + (curMode === 'outline' ? 'wiki 经典格式' : '紧凑描边格式') + '）', 'ok');
+      studioHide();
+    } catch (e) {
+      console.error('[studioExportBlk] FAILED:', e);
+      setStatus('工作台导出失败：' + e.message, 'err');
+    }
+  }, 30);
+}
+
+// studio 画布 → 骨架化 → 路径追踪 → 紧凑格式 blk
+const STUDIO_EXPORT_VERSION = 'v2.6.3';
+function studioCanvasToBlk() {
+  const W = studio.W, H = studio.H;
+  console.log('[studioExport] version=' + STUDIO_EXPORT_VERSION + ' pipeline canvas=' + W + 'x' + H + ' (userCanvas-only + alpha check + unified compression)');
+
+  // === NaN 防护：WT 常量必须存在 ===
+  if (typeof WT_X_OFFSET === 'undefined' || typeof WT_Y_CENTER === 'undefined' || typeof Y_BLK_SCALE === 'undefined') {
+    alert('❌ 浏览器跑的是旧代码（全局常量丢失！）\n请完全关闭浏览器后重新打开页面\n版本：' + STUDIO_EXPORT_VERSION);
+    console.error('[studioExport] FATAL: WT constants undefined!');
+    return null;
+  }
+  // === 防护结束 ===
+
+  // Phase 1: 只读用户层 userCanvas（AI 线稿 + 用户画笔都在这层）
+  // 不合成 refCanvas！ref 是原照片，照片暗部会被当成墨水 → 全图碎片（历史教训）
+  if (!studio.userCanvas) { console.warn('[studioExport] no userCanvas'); return null; }
+  const src = studio.userCanvas;
+
+  const imgData = src.getContext('2d').getImageData(0, 0, W, H);
+  const data = imgData.data;
+
+  // 目标网格分辨率
+  const GW = Math.min(1200, W);
+  const GH = Math.max(1, Math.round(GW * H / W));
+  const gN = GW * GH;
+  const bw = W / GW, bh = H / GH;
+
+  // Phase 2: 下采样 + 二值化（ink = 黑像素）
+  // 直接用采样而非重绘，保持原图精度
+  const inkD = new Uint8Array(gN);
+  for (let gy = 0; gy < GH; gy++) {
+    const y0 = Math.floor(gy * bh), y1 = Math.floor((gy + 1) * bh);
+    for (let gx = 0; gx < GW; gx++) {
+      const x0 = Math.floor(gx * bw), x1 = Math.floor((gx + 1) * bw);
+      let black = false;
+      for (let py = y0; py < y1 && py < H && !black; py++) {
+        for (let px = x0; px < x1 && px < W && !black; px++) {
+          const idx = (py * W + px) * 4;
+          // userCanvas 透明背景：透明像素 RGBA=(0,0,0,0) 必须用 alpha 排除！
+          if (data[idx+3] > 100) {
+            const r = data[idx], g = data[idx+1], b = data[idx+2];
+            if (r < 120 && g < 120 && b < 120) black = true;
+          }
+        }
+      }
+      if (black) inkD[gy * GW + gx] = 1;
+    }
+  }
+
+  // 统计
+  let inkCount = 0; for (let i = 0; i < gN; i++) if (inkD[i]) inkCount++;
+  console.log('[studioExport] grid=' + GW + 'x' + GH + ' ink=' + inkCount + '/' + gN);
+  if (inkCount < 50) { console.warn('[studioExport] too few ink pixels'); return null; }
+
+  // Phase 3: 骨架化链
+  // 不需要 flood fill（studio 已经是纯线稿），不需要 dilate/deburr
+  const t0 = performance.now();
+  const zs = zhangSuen(inkD, GW, GH);
+  const t1 = thinTo1px(zs, GW, GH);
+  const t2 = pruneSpurs(t1, GW, GH, 4); // studio 线条可能细，毛刺阈值调低
+  // 用原始 inkD 做 band 辅助 stitch
+  const st = stitchEnds(t2, GW, GH, 8, inkD);
+  const sk = st.m;
+
+  // Phase 4: 路径追踪
+  const rawPaths = skeletonPaths(sk, GW, GH);
+  const merged = mergeChains(rawPaths, GW);
+  console.log('[studioExport] skeleton time=' + Math.round(performance.now() - t0) + 'ms rawPaths=' + rawPaths.length + ' merged=' + merged.length);
+
+  if (!merged.length) { console.warn('[studioExport] no paths after merge'); return null; }
+
+  // Phase 5: grid index → [x,y] 转换 + chaikin 平滑 + 复用主生成器统一裁剪管线
+  // （噪点过滤 <3 段 / dpOpen 自适应 / 长度优先贪心 / avgY 排序——保证不砍腿）
+  const GW2 = GW, GH2 = GH;
+  // 关键：merged 是 grid 一维索引数组（数字），必须先转成 [gx, gy] 二维坐标！
+  // 主生成器 L2914 也做了这步转换，studioExportBlk L7269 也做了，唯独这里漏了！
+  const cleaned = merged
+    .filter(pts => pts.length >= 2)
+    .map(pts => pts.map(k => [k % GW2, (k / GW2) | 0]))  // grid index → [gx, gy]
+    .map(pts => chaikinOpen(pts, 2));
+  const fakeO = { _rawPaths: cleaned, GW: GW2, GH: GH2 };
+  const compressed = getCompressedPaths(fakeO);
+  if (!compressed.length) { console.warn('[studioExport] no paths after compression'); return null; }
+
+  // Phase 6: 坐标映射 → WT blk wiki 格式
+  // studio canvas (1920×1080 = 16:9) 本身就是 WT 屏幕的 1:1 像素模拟
+  // Phase 1 从 userCanvas 采样 → grid (GW×GH, 比例 = H/W = 9/16)
+  // AI 线稿贴入 studio canvas 时已经经过 sight box 映射（studioLoadReference）
+  // 所以 grid 点坐标直接对应 WT 屏幕坐标，**不需要再做 sight box 映射！**
+  //
+  // WT blk 坐标系：
+  //   bx ∈ [-0.5, +0.5]（左→右，原点=屏幕中心）
+  //   by ∈ [-0.28125, +0.28125]（上→下，原点=屏幕中心，WT y 向下为正）
+  //
+  // studio canvas 坐标系：
+  //   cx ∈ [0, W=1920]（左→右）
+  //   cy ∈ [0, H=1080]（上→下，和 WT y 方向一致！）
+  //
+  // 映射公式（canvasToBlk 同款）：
+  //   bx = (cx / W) - 0.5         → 0→-0.5, W→+0.5
+  //   by = (cy / H) * Y_BLK_SCALE - WT_Y_CENTER → 0→-0.28125, H→+0.28125
+  console.log('[studioExport] canvas-direct mapping (no sight box re-apply) GW2=' + GW2 + ' GH2=' + GH2);
+  if (!isFinite(GW2) || !isFinite(GH2) || GW2 <= 0 || GH2 <= 0) {
+    console.error('[studioExport] FATAL: non-finite grid params! GW2=' + GW2 + ' GH2=' + GH2);
+    return null;
+  }
+
+  // blk header：sight 参数仅用于 header 文本，不影响坐标
+  const sightW = sight.w || 0.35;
+  const sightX0 = sight.x0 || (1 - sightW) / 2;
+  const sightY0 = sight.y0 || 0;
+  const oHdr = {
+    x0: sightX0, y0: sightY0, w: sightW,
+    GW: GW2, GH: GH2, artH: sightW * GH2 / GW2,
+    cross: ($('cross')?.checked ?? true), mark: '',
+    fillStrength: 0, lines: '',
+  };
+  const L = blkHeader(oHdr);
+  L.push('drawLines{');
+
+  // 精简小数
+  const F3 = (v) => {
+    let s = v.toFixed(3);
+    s = s.replace(/\.?0+$/, '');
+    return s;
+  };
+
+  let totalSegs = 0;
+  let segStrs = '';
+
+  for (const cp of compressed) {
+    const pts = cp.pts;
+    // 同一路径内：第 0 段 move:true，后续省略（隐含 false，连续画）
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      // grid (gx,gy) → canvas (cx,cy) → WT blk (bx,by)
+      // grid 比例 = studio canvas 比例 = WT 屏幕比例
+      const ax = a[0] / GW2;              // 0..1
+      const ay = a[1] / GH2;              // 0..1
+      const bx2 = b[0] / GW2;
+      const by2 = b[1] / GH2;
+
+      const x1 = F3(ax - 0.5);                              // WT X
+      const y1 = F3(ay * Y_BLK_SCALE - WT_Y_CENTER);        // WT Y
+      const x2 = F3(bx2 - 0.5);
+      const y2 = F3(by2 * Y_BLK_SCALE - WT_Y_CENTER);
+      if (Math.abs(x1 - x2) < 1e-9 && Math.abs(y1 - y2) < 1e-9) continue;
+
+      const isFirst = (i === 0);
+      if (isFirst) {
+        segStrs += 'line {line:p4=' + x1 + ',' + y1 + ',' + x2 + ',' + y2 + ';move:b=false;}\n';
+      } else {
+        segStrs += 'line {line:p4=' + x1 + ',' + y1 + ',' + x2 + ',' + y2 + '; move:b=false;}\n';
+      }
+      totalSegs++;
+    }
+  }
+
+  L.push(segStrs);
+  L.push('}');
+  let raw = L.join('\n');
+  console.log('[studioExport] paths=' + compressed.length + ' segs=' + totalSegs + ' bytes=' + raw.length + ' (limit ' + BLK_SIZE_LIMIT + ')');
+
+  if (raw.length > BLK_SIZE_LIMIT) {
+    // 理论上 getCompressedPaths 已控制段数，这里只是极端兜底
+    const trimmed = trimBlkToSize(raw, BLK_SIZE_LIMIT);
+    raw = trimmed.str;
+    console.warn('[studioExport] TRIMMED to ' + raw.length + ' B (limit ' + BLK_SIZE_LIMIT + ')');
+  }
+
+  return raw;
 }
 
 // 绑定进入按钮

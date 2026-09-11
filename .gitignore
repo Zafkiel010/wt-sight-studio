@@ -32,6 +32,7 @@ _downloads/
 # 参考/脚本目录（本地开发用）
 _ref/
 _serve.ps1
+_serve18924.ps1
 _render.ps1
 convert.ps1
 _exportblkmenu.js
@@ -41,3 +42,11 @@ _tools.js
 _vectorize-worker.js
 _vectorize.js
 opencv.js
+
+# 备份/测试/智能体本地文件（不发布）
+backup/
+zip_check/
+.trae/
+reisen.jpg
+test_*.blk
+*_good.blk

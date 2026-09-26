@@ -4503,7 +4503,7 @@ function getCompressedPaths(o) {
 // === 公共：blk 坐标路径数组 → 紧凑格式 blk 字符串，带严格字节预算闭环 ===
 // paths: [{ pts:[[blkX,blkY],...], avgY }]（点已经是 WT blk 坐标系）
 // headerLines: blkHeader() 返回的数组（不含 drawLines）
-// byteBudget: 目标总字节上限（调用方留余量，建议 BLK_SIZE_LIMIT - 4096）
+// byteBudget: 目标总字节上限（调用方留余量，建议 BLK_SIZE_LIMIT - 16384）
 // 返回 { raw, segCount, pathCount, trimmed }
 // 关键：超限时逐级加大 dpOpen eps（全局均匀简化，不砍尾），最后长度优先贪心（保长轮廓=保腿）
 function buildCompactBlkFromBlkPaths(paths, headerLines, byteBudget, options) {
@@ -4647,7 +4647,7 @@ function buildTraceBlk(o) {
     return { pts, avgY: cp.avgY };
   });
   // 严格字节预算闭环（≤ BLK_SIZE_LIMIT-4096，绝不靠砍尾部）
-  const r = buildCompactBlkFromBlkPaths(blkPaths, L, BLK_SIZE_LIMIT - 4096, { dropAllOutside: true });
+  const r = buildCompactBlkFromBlkPaths(blkPaths, L, BLK_SIZE_LIMIT - 16384, { dropAllOutside: true });
   console.log('[traceBlk] FINAL: ' + r.pathCount + ' paths, ' + r.segCount + ' segs, ' + r.raw.length + '/' + BLK_SIZE_LIMIT + ' bytes' + (r.trimmed ? ' [greedy-pruned]' : ''));
   if (r.raw.length > BLK_SIZE_LIMIT) {
     // 理论上不会触发（闭环已保证），最后防线
@@ -4712,10 +4712,10 @@ function buildOutlineBlk(o) {
 
   // 字节预算闭环：超限时按行跳（跳过某些行，每行全保留或全丢弃），保证预览和 .blk 完全一致
   o._outlineSkipFactor = 1;
-  if (raw.length > BLK_SIZE_LIMIT) {
+  if (raw.length > BLK_SIZE_LIMIT - 16384) {
     console.warn('[outlineBlk] over budget, reducing resolution...');
     const headerBytes = L.slice(0, -2).join('\n').length + 40;
-    const targetSegs = Math.floor((BLK_SIZE_LIMIT - headerBytes) / 55); // ~55 B/seg
+    const targetSegs = Math.floor(((BLK_SIZE_LIMIT - 16384) - headerBytes) / 55); // ~55 B/seg，留 16KB 余量防撞上限
     // 先用完整扫描算每行平均段数
     const segsPerRow = segCount / GH;
     // 目标行数：targetSegs / 每行平均段数
@@ -7342,7 +7342,7 @@ function studioExportBlk() {
       } else {
         // === 描边模式（紧凑格式 + move:b=false，两天前 studioCanvasToBlk 风格）===
         const L = blkHeader(oHdr);
-        const r = buildCompactBlkFromBlkPaths(paths, L, BLK_SIZE_LIMIT - 4096);
+        const r = buildCompactBlkFromBlkPaths(paths, L, BLK_SIZE_LIMIT - 16384);
         blk = r.raw;
         segCount = r.segCount;
         pathCount = r.pathCount;

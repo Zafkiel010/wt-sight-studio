@@ -2735,7 +2735,7 @@ function convert(o) {
       const wx0 = o.x0 + ax / GW * o.w, wy0 = o.y0 * Y_BLK_SCALE + (ay / GH) * artH;
       const wx1 = o.x0 + bx / GW * o.w, wy1 = o.y0 * Y_BLK_SCALE + (by / GH) * artH;
       if (Math.abs(wx0 - wx1) < 1e-9 && Math.abs(wy0 - wy1) < 1e-9) continue;
-      const segStr = '  line {line:p4=' + F(wx0 + WT_X_OFFSET) + ',' + F(wy0 - WT_Y_CENTER) + ',' + F(wx1 + WT_X_OFFSET) + ',' + F(wy1 - WT_Y_CENTER) + '; move:b=true;}\n';
+      const segStr = '  line {line:p4=' + F(wx0 + WT_X_OFFSET) + ',' + F(wy0 - WT_Y_CENTER) + ',' + F(wx1 + WT_X_OFFSET) + ',' + F(wy1 - WT_Y_CENTER) + '; move:b=false;}\n';
       pushSeg(ay, segStr);
       polylines.push({ p: [[ax, ay], [bx, by]], closed: false, fill: true });
       fillRuns++;
@@ -2751,7 +2751,7 @@ function convert(o) {
       const ax = o.x0 + a[0] / GW * o.w, ay = o.y0 * Y_BLK_SCALE + (a[1] / GH) * artH;
       const bx = o.x0 + b[0] / GW * o.w, by = o.y0 * Y_BLK_SCALE + (b[1] / GH) * artH;
       if (Math.abs(ax - bx) < 1e-9 && Math.abs(ay - by) < 1e-9) continue;
-      const segStr = '  line {line:p4=' + F(ax + WT_X_OFFSET) + ',' + F(ay - WT_Y_CENTER) + ',' + F(bx + WT_X_OFFSET) + ',' + F(by - WT_Y_CENTER) + '; move:b=true;}\n';
+      const segStr = '  line {line:p4=' + F(ax + WT_X_OFFSET) + ',' + F(ay - WT_Y_CENTER) + ',' + F(bx + WT_X_OFFSET) + ',' + F(by - WT_Y_CENTER) + '; move:b=false;}\n';
       const ayGrid = (a[1] + b[1]) / 2;   // 用两顶点平均 grid-Y 参与整段排序
       pushSeg(ayGrid, segStr);
     }
@@ -4511,7 +4511,7 @@ function buildCompactBlkFromBlkPaths(paths, headerLines, byteBudget, options) {
   const F4 = (v) => { let s = v.toFixed(4); s = s.replace(/\.?0+$/, ''); return s; };
   const fmtSeg = (x1, y1, x2, y2, isFirst) =>
     'line{line:p4=' + F4(x1) + ',' + F4(y1) + ',' + F4(x2) + ',' + F4(y2) +
-    (isFirst ? ';move:b=true;}\n' : ';}\n');
+    (isFirst ? ';move:b=false;}\n' : ';}\n');
 
   // 用 F4（4 位小数）格式，过滤掉格式化后变成零长度的段
   function dedupPts(pts) {
@@ -4768,12 +4768,12 @@ function appendManualLayerToBlk(blkStr) {
   let L = '';
   const F3 = (v) => { let s = v.toFixed(3); s = s.replace(/\.?0+$/, ''); return s; };
   for (const ln of manualState.lines) {
-    L += 'line{line:p4=' + F3(ln.x1) + ',' + F3(ln.y1) + ',' + F3(ln.x2) + ',' + F3(ln.y2) + ';move:b=true;}\n';
+    L += 'line{line:p4=' + F3(ln.x1) + ',' + F3(ln.y1) + ',' + F3(ln.x2) + ',' + F3(ln.y2) + ';move:b=false;}\n';
   }
   // 手动文字用 text{} section
   let T = '';
   for (const t of manualState.texts) {
-    T += 'text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F3(t.x) + ',' + F3(t.y) + '; size=' + F3(t.size) + '; move:b=true;}\n';
+    T += 'text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F3(t.x) + ',' + F3(t.y) + '; size=' + F3(t.size) + '; move:b=false;}\n';
   }
   if (!L && !T) return blkStr;
   // 找到 drawLines{} 块的结尾（括号平衡算法）
@@ -4847,7 +4847,7 @@ function generateManualOnlyBlk() {
   // 收集手动层段（全部 P0）
   const packSegs = [];
   for (const ln of manualState.lines) {
-    const segStr = '  line {line:p4=' + F(ln.x1) + ',' + F(ln.y1) + ',' + F(ln.x2) + ',' + F(ln.y2) + '; move:b=true;}\n';
+    const segStr = '  line {line:p4=' + F(ln.x1) + ',' + F(ln.y1) + ',' + F(ln.x2) + ',' + F(ln.y2) + '; move:b=false;}\n';
     const isFill = Math.abs(ln.y1 - ln.y2) < 1e-6;
     const y = Math.floor((ln.y1 + ln.y2) / 2 * 1000);
     packSegs.push({ pri: 0, y, str: segStr, isFill });
@@ -4857,7 +4857,7 @@ function generateManualOnlyBlk() {
   L.push('drawLines{'); L.push(packed.lines); L.push('}');
   // 手动文字
   for (const t of manualState.texts) {
-    L.push('  text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F(t.x) + ',' + F(t.y) + '; size=' + F(t.size) + '; move:b=true;}\n');
+    L.push('  text{text="' + t.text.replace(/"/g, '\\"') + '"; position:p2=' + F(t.x) + ',' + F(t.y) + '; size=' + F(t.size) + '; move:b=false;}\n');
   }
   let raw = L.join('\n');
   if (raw.length > BLK_SIZE_LIMIT) {
@@ -5027,6 +5027,7 @@ function doGenerate({ retuneAuto, buttonLabel }) {
   go.disabled = true; const goM = $('goManual'); if (goM) goM.disabled = true;
 
   const mode = $('genMode')?.value || 'trace';
+  // === sight box：完全尊重用户设置（你想放左边就放左边，想放右边就放右边）===
   // === 强制保护：outline 模式必须用原图（不能是 AI 线稿）===
   if (mode === 'outline' && srcOriginal && img !== srcOriginal) {
     console.log('[doGenerate] outline 模式：强制恢复 img 到原图（之前可能被 trace 的 AI sketch 覆盖）');
@@ -7113,7 +7114,7 @@ function studioImportManual() {
 }
 
 // ============ 导入 .blk → 手动层继续编辑 ============
-// 解析 line {line:p4=X1,Y1,X2,Y2; move:b=true;} 与 text{text="…"; position:p2=X,Y; size=S; …}
+// 解析 line {line:p4=X1,Y1,X2,Y2; move:b=false;} 与 text{text="…"; position:p2=X,Y; size=S; …}
 // 坐标已是 blk 空间，直接并入 manualState（可撤销）；工作台开着则同步光栅化到画布
 function importBlkText(text, srcName) {
   const lineRe = /line\s*\{\s*line\s*:\s*p4\s*=\s*(-?[\d.eE+]+)\s*,\s*(-?[\d.eE+]+)\s*,\s*(-?[\d.eE+]+)\s*,\s*(-?[\d.eE+]+)/g;
@@ -7339,7 +7340,7 @@ function studioExportBlk() {
         blk = L.join('\n');
         console.log('[studioExport] OUTLINE mode paths=' + pathCount + ' segs=' + segCount + ' bytes=' + blk.length);
       } else {
-        // === 描边模式（紧凑格式 + move:b=true，两天前 studioCanvasToBlk 风格）===
+        // === 描边模式（紧凑格式 + move:b=false，两天前 studioCanvasToBlk 风格）===
         const L = blkHeader(oHdr);
         const r = buildCompactBlkFromBlkPaths(paths, L, BLK_SIZE_LIMIT - 4096);
         blk = r.raw;

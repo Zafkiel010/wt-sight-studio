@@ -426,6 +426,9 @@ document.addEventListener('click', e => {
 <div class="wrap">
   <header class="hd">
     <h1>WT Sight Studio <span class="mark">· 战雷瞄具生成器</span> <span class="ver">Alpha</span></h1>
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 14px;margin:6px 0 0;color:#856404;font-size:13px;line-height:1.6">
+      ⚠️ 孩子们现在自定义瞄具有 bug —— 如果瞄具图案太复杂的话，开镜时右下角小地图的坦克图标会消失。懒狗 gaijin 现在还没修，所以大家的瞄具尽量不要太复杂和缩放得太大喵
+    </div>
   </header>
   <div class="sub">下面的「战雷瞄具预览」里直接拖动图案就能改 XY 位置和大小</div>
 
@@ -637,6 +640,8 @@ const WT_Y_CENTER = 9 / 32; // = (9/16) / 2 = 半高 = 0.28125
 // 超过此大小，我们主动按行裁尾保持 drawLines{} 闭合完整，此时 UI 会明确打 ⚠ 提示；低于此值则显式标 ✓ 完整未裁。
 const BLK_SIZE_SAFETY_MARGIN = 2048;
 const BLK_SIZE_LIMIT = 855183 - BLK_SIZE_SAFETY_MARGIN; // = 853135
+// WT drawLines 段数参考值：超过此数值有概率触发 UI 异常（小地图消失），但不强制截断
+const BLK_SEG_REFERENCE = 12000;
 // 对构建好的完整 blk 字符串按行裁尾到 ≤ limit 字节，保持 drawLines{ / } 闭合完整；返回 {str, trimmed}
 function trimBlkToSize(raw, limit) {
   if (!raw || raw.length <= limit) return { str: raw, trimmed: 0 };
@@ -845,7 +850,7 @@ function setStatus(msg, cls) {
       if (msg.includes(zh)) msg = msg.split(zh).join(en);
     }
   }
-  statusEl.textContent = msg; statusEl.className = cls || '';
+  statusEl.innerHTML = msg; statusEl.className = cls || '';
 }
 
 function drawSrcPreview() {
@@ -3282,7 +3287,11 @@ function convert(o) {
   pvWrap.style.display = 'block';
   pv.classList.add('ratio-aware');
   pv.style.setProperty('--ar', pv.width + ' / ' + pv.height);
-  pvTag.textContent = '预览·线稿中心线 · 网格 ' + GW + '×' + GH + ' · 线段 ' + segCount + (capped ? '+（已达上限，可调大填充最小块/降精度）' : ' 条') + ' · 填白 ' + Math.round(bgCount / N * 100) + '% · ' + o.stats + ' · 耗时 ' + ((performance.now() - t0) / 1000).toFixed(1) + 's';
+  const segPct1 = Math.round(segCount / BLK_SEG_REFERENCE * 100);
+  const segColor1 = segPct1 > 90 ? '#ff3333' : segPct1 > 70 ? '#ff9900' : '#22aa44';
+  const segBold1 = segPct1 > 70 ? '<b style="color:' + segColor1 + '">' : '';
+  const segBold1e = segPct1 > 70 ? '</b>' : '';
+  pvTag.innerHTML = '预览·线稿中心线 · 网格 ' + GW + '×' + GH + ' · 线段 ' + segBold1 + segCount + ' / ' + BLK_SEG_REFERENCE + '（' + segPct1 + '%）' + segBold1e + (capped ? ' <span style="color:#ff3333">⚠ 已达上限</span>' : '') + ' · 填白 ' + Math.round(bgCount / N * 100) + '% · ' + o.stats + ' · 耗时 ' + ((performance.now() - t0) / 1000).toFixed(1) + 's';
 
   // stash for sight preview redraw
   o._polylines = polylines;
@@ -3327,7 +3336,11 @@ function convert(o) {
   const compBadge = isComplete
     ? ('✓ 完整未裁（' + sizeKB + '/' + (BLK_SIZE_LIMIT/1024).toFixed(0) + 'KB · 余 ' + remainKB + 'KB）')
     : ('⚠ 已裁尾（裁 ' + (cappedBytes/1024).toFixed(1) + 'KB · 现在 ' + sizeKB + 'KB）');
-  pvTag.textContent = '预览·线稿中心线 · ' + compBadge + ' · 网格 ' + GW + '×' + GH + ' · 线段 ' + segCount + (capped ? '+' : '') + ' 条 · 填白 ' + Math.round(bgCount / N * 100) + '% · ' + o.stats + ' · 耗时 ' + ((performance.now() - t0) / 1000).toFixed(1) + 's';
+  const segPct2 = Math.round(segCount / BLK_SEG_REFERENCE * 100);
+  const segColor2 = segPct2 > 90 ? '#ff3333' : segPct2 > 70 ? '#ff9900' : '#22aa44';
+  const segBold2 = segPct2 > 70 ? '<b style="color:' + segColor2 + '">' : '';
+  const segBold2e = segPct2 > 70 ? '</b>' : '';
+  pvTag.innerHTML = '预览·线稿中心线 · ' + compBadge + ' · 网格 ' + GW + '×' + GH + ' · 线段 ' + segBold2 + segCount + ' / ' + BLK_SEG_REFERENCE + '（' + segPct2 + '%）' + segBold2e + (capped ? ' <span style="color:#ff3333">⚠ 已达上限</span>' : '') + ' · 填白 ' + Math.round(bgCount / N * 100) + '% · ' + o.stats + ' · 耗时 ' + ((performance.now() - t0) / 1000).toFixed(1) + 's';
   return finalBlk;
 }
 
@@ -7366,7 +7379,9 @@ function studioExportBlk() {
       a.download = 'final_' + ts + '_studio_sight_' + modeTag + '.blk';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      setStatus('工作台导出成功：' + strokeCount + ' 笔矢量 + AI 线稿 → ' + segCount + ' 段 / ' + blk.length + ' B（' + (curMode === 'outline' ? 'wiki 经典格式' : '紧凑描边格式') + '）', 'ok');
+      const _pct = Math.round(segCount / BLK_SEG_REFERENCE * 100);
+      const _col = _pct > 90 ? '#ff3333' : _pct > 70 ? '#ff9900' : '#22aa44';
+      setStatus('工作台导出成功：' + strokeCount + ' 笔矢量 + AI 线稿 → <b style="color:' + _col + '">' + segCount + ' / ' + BLK_SEG_REFERENCE + '（' + _pct + '%）</b> · ' + blk.length + ' B（' + (curMode === 'outline' ? 'wiki 经典格式' : '紧凑描边格式') + '）', 'ok');
       studioHide();
     } catch (e) {
       console.error('[studioExportBlk] FAILED:', e);

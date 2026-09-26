@@ -644,59 +644,46 @@ const BLK_SIZE_LIMIT = 855183 - BLK_SIZE_SAFETY_MARGIN; // = 853135
 const BLK_SEG_REFERENCE = 12000;
 // 对构建好的完整 blk 字符串按行裁尾到 ≤ limit 字节，保持 drawLines{ / } 闭合完整；返回 {str, trimmed}
 function trimBlkToSize(raw, limit) {
-  if (!raw || raw.length <= limit) return { str: raw, trimmed: 0 };
+  if (!raw) return { str: raw, trimmed: 0 };
+  // 即使没超 limit，也要保证 drawLines 闭合（防止某些路径漏了）
+  const ensure = (s, maxLen) => {
+    const dlStart = s.indexOf('drawLines{');
+    if (dlStart < 0) return s;
+    let depth = 0, closed = false;
+    for (let i = dlStart; i < s.length; i++) {
+      if (s[i] === '{') depth++;
+      if (s[i] === '}') { depth--; if (depth === 0) { closed = true; break; } }
+    }
+    if (closed) return s;
+    let fixed = s;
+    while (fixed.length + 3 > maxLen && fixed.length > 10) {
+      const nl = fixed.lastIndexOf('\n');
+      if (nl <= 0) break;
+      fixed = fixed.substring(0, nl);
+    }
+    return fixed.replace(/\s+$/, '') + '\n}\n';
+  };
+  if (raw.length <= limit) {
+    const fixed = ensure(raw, limit);
+    return { str: fixed, trimmed: fixed !== raw };
+  }
   // 从 limit 位置向左回退到最近一个 \n，保证不把单条 line{} 切一半
   let cut = limit;
   while (cut > 0 && raw.charAt(cut) !== '\n') cut--;
   if (cut <= 0) { cut = limit; }
   let out = raw.substring(0, cut);
-  // 保证 drawLines{ 与 } 结构闭合：如果 out 尾部缺 closing '}'，回退若干行后补 '}'
-  const openN  = (out.match(/drawLines\s*\{/g) || []).length;
-  // 只把"末行只有 }"作为 drawLines 结束标志，避免误数顶层其他 section 的 }
-  // 技巧：从 drawLines{ 往后扫描 section，匹配缩进层级（2空格缩进的 line{} / 外层 0 缩进的 }）
-  const closeMatches = out.match(/^\}\s*$/gm);
-  const closeN = closeMatches ? closeMatches.length : 0;
+  out = ensure(out, limit);
+  // 如果补完还是超限，继续裁尾（整行裁，保持闭合）
   let tries = 0;
-  while ((openN > closeN || (out.length + 3) > limit) && tries++ < 2000) {
+  while (out.length > limit && tries++ < 1000) {
     const nl = out.lastIndexOf('\n');
     if (nl <= 0) break;
-    out = out.substring(0, nl);
-    // 再数一次 closing brace
-    const cm = out.match(/^\}\s*$/gm);
-    const cn = cm ? cm.length : 0;
-    // 当 drawLines 已经有对等 } 且补 '}' 后也不超限时，停止回退
-    const withClose = out.replace(/\s+$/, '') + '\n}\n';
-    if (openN <= cn && withClose.length <= limit) {
-      out = withClose;
-      break;
-    }
-    // 否则只要 withClose ≤ limit 且 openN == cn+1（还缺1个），直接补
-    if (openN === cn + 1 && withClose.length <= limit) {
-      out = withClose;
-      break;
-    }
-  }
-  // 兜底：如果循环结束仍然没有闭合（因为算法或边界异常），强制截到 drawLines 开后，保证无半残行再补 '}'
-  const finalOpen = (out.match(/drawLines\s*\{/g) || []).length;
-  const finalClose = (out.match(/^\}\s*$/gm) || []).length;
-  if (finalOpen > finalClose) {
-    // 先去掉末行可能的半截 line{…
-    const lastNL = out.lastIndexOf('\n');
-    if (lastNL > 0) out = out.substring(0, lastNL);
-    let candidate = out.replace(/\s+$/, '') + '\n}\n';
-    // 如果补完仍然超限，就再回退 100 行直到能放下
-    let safety = 0;
-    while (candidate.length > limit && safety++ < 1000) {
-      const nl2 = out.lastIndexOf('\n');
-      if (nl2 <= 0) break;
-      out = out.substring(0, nl2);
-      candidate = out.replace(/\s+$/, '') + '\n}\n';
-    }
+    let candidate = out.substring(0, nl);
+    candidate = ensure(candidate, limit);
+    if (candidate.length >= out.length) break;
     out = candidate;
-  } else {
-    out = out.replace(/\s+$/, '') + '\n';
   }
-  return { str: out, trimmed: raw.length - out.length };
+  return { str: out, trimmed: true };
 }
 
 // ============ 智能容量管理器 safePack ============

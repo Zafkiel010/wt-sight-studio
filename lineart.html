@@ -84,8 +84,9 @@
     margin-bottom: 16px;
   }
 
-  /* ============ Drop Zone ============ */
+  /* ============ Drop Zone（唯一容器，不再嵌套 card） ============ */
   .drop {
+    display: block;
     position: relative;
     border: 2px dashed var(--border-strong);
     border-radius: var(--radius-lg);
@@ -93,15 +94,17 @@
     text-align: center;
     cursor: pointer;
     transition: all .25s cubic-bezier(.4,0,.2,1);
-    background: rgba(255,255,255,0.01);
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
   .drop:hover {
     border-color: var(--accent);
-    background: rgba(129,140,248,0.04);
+    background: rgba(129,140,248,0.06);
   }
   .drop.drag {
     border-color: var(--accent);
-    background: rgba(129,140,248,0.08);
+    background: rgba(129,140,248,0.10);
     transform: scale(1.01);
   }
   .drop input[type="file"] {
@@ -109,8 +112,8 @@
     opacity: 0; cursor: pointer; z-index: 2;
   }
   .drop-emoji { font-size: 32px; margin-bottom: 8px; display: block; }
-  .drop-text { font-size: 15px; color: var(--text); margin-bottom: 4px; }
-  .drop-hint { font-size: 12px; color: var(--text-faint); }
+  .drop-text { font-size: 15px; color: var(--text); margin-bottom: 4px; display: block; }
+  .drop-hint { font-size: 12px; color: var(--text-faint); display: block; }
 
   /* ============ Previews ============ */
   .previews {
@@ -341,14 +344,12 @@
   </div>
 
   <!-- Upload -->
-  <div class="card" style="padding:0;">
-    <label class="drop" id="drop">
-      <span class="drop-emoji">📷</span>
-      <span class="drop-text">点击选择图片 或 拖拽到这里</span>
-      <span class="drop-hint">支持 PNG / JPG / WEBP · 建议人物立绘或头像</span>
-      <input type="file" id="file" accept="image/*">
-    </label>
-  </div>
+  <label class="drop" id="drop">
+    <span class="drop-emoji">📷</span>
+    <span class="drop-text">点击选择图片 或 拖拽到这里</span>
+    <span class="drop-hint">支持 PNG / JPG / WEBP · 建议人物立绘或头像</span>
+    <input type="file" id="file" accept="image/*">
+  </label>
 
   <!-- Previews -->
   <div class="previews">

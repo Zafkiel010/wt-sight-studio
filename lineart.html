@@ -551,11 +551,11 @@
 
   <!-- Action -->
   <div class="action-bar">
-    <button class="btn btn-primary" id="goBtn" disabled>
-      ✨ 生成线稿
+    <button class="btn btn-primary" id="goBtn" disabled title="首次生成：上传图片后点这里">
+      ✨ AI 生成线稿
     </button>
-    <button class="btn btn-secondary" id="recolorBtn" disabled>
-      🎨 只改颜色
+    <button class="btn btn-secondary has-tooltip" id="recolorBtn" disabled data-tip="已生成线稿后，换颜色/强度秒刷新，不重跑 AI">
+      🔄 重新渲染
     </button>
     <button class="btn btn-download" id="dlBtn" disabled>
       💾 下载 PNG

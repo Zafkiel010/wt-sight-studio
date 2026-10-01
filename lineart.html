@@ -8,10 +8,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --bg-1: #0f0f1a;
-    --bg-2: #1a1a2e;
-    --bg-3: #16213e;
     --surface: rgba(255,255,255,0.04);
-    --surface-hover: rgba(255,255,255,0.07);
+    --surface-2: rgba(255,255,255,0.07);
     --border: rgba(255,255,255,0.08);
     --border-strong: rgba(255,255,255,0.15);
     --text: #e8e8f0;
@@ -25,7 +23,6 @@
     --warning: #fbbf24;
     --radius-lg: 16px;
     --radius-md: 10px;
-    --radius-sm: 6px;
   }
   html { font-size: 14px; }
   body {
@@ -34,395 +31,219 @@
     color: var(--text);
     min-height: 100vh;
     position: relative;
-    overflow-x: hidden;
   }
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background:
       radial-gradient(ellipse 80% 60% at 10% 0%, rgba(129,140,248,0.12) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 100% 100%, rgba(192,132,252,0.10) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 40% at 50% 50%, rgba(52,211,153,0.04) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
+      radial-gradient(ellipse 60% 50% at 100% 100%, rgba(192,132,252,0.10) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
   }
 
-  /* ============ Layout ============ */
-  .app {
-    position: relative;
-    z-index: 1;
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 48px 24px 80px;
-  }
+  .app { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 32px 20px 60px; }
 
-  /* ============ Header ============ */
-  .header { text-align: center; margin-bottom: 36px; }
-  .logo {
-    display: inline-flex; align-items: center; gap: 12px;
-    margin-bottom: 10px;
-  }
+  /* Header */
+  .header { text-align: center; margin-bottom: 24px; }
+  .logo { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 6px; }
   .logo-icon {
-    width: 44px; height: 44px; border-radius: 12px;
+    width: 40px; height: 40px; border-radius: 12px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-    box-shadow: 0 4px 20px var(--accent-glow);
+    font-size: 20px; box-shadow: 0 4px 20px var(--accent-glow);
   }
-  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
-  .tagline { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+  h1 { font-size: 20px; font-weight: 600; }
+  .tagline { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
 
-  /* ============ Card ============ */
+  /* Workbench: 左图右功能 */
+  .workbench { display: grid; grid-template-columns: 1fr 330px; gap: 16px; align-items: start; }
+
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 16px;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    margin-bottom: 16px;
   }
 
-  /* ============ Drop Zone（唯一容器，不再嵌套 card） ============ */
+  /* Drop zone */
   .drop {
-    display: block;
-    position: relative;
+    display: block; position: relative;
     border: 2px dashed var(--border-strong);
     border-radius: var(--radius-lg);
-    padding: 48px 20px;
-    text-align: center;
-    cursor: pointer;
+    padding: 90px 20px;
+    text-align: center; cursor: pointer;
     transition: all .25s cubic-bezier(.4,0,.2,1);
     background: var(--surface);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
   }
-  .drop:hover {
-    border-color: var(--accent);
-    background: rgba(129,140,248,0.06);
-  }
-  .drop.drag {
-    border-color: var(--accent);
-    background: rgba(129,140,248,0.10);
-    transform: scale(1.01);
-  }
-  .drop input[type="file"] {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    opacity: 0; cursor: pointer; z-index: 2;
-  }
-  .drop-emoji { font-size: 32px; margin-bottom: 8px; display: block; }
-  .drop-text { font-size: 15px; color: var(--text); margin-bottom: 4px; display: block; }
+  .drop:hover { border-color: var(--accent); background: rgba(129,140,248,0.06); }
+  .drop.drag { border-color: var(--accent); background: rgba(129,140,248,0.10); transform: scale(1.01); }
+  .drop input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2; }
+  .drop-emoji { font-size: 36px; display: block; margin-bottom: 10px; }
+  .drop-text { font-size: 15px; margin-bottom: 4px; display: block; }
   .drop-hint { font-size: 12px; color: var(--text-faint); display: block; }
 
-  /* ============ Previews ============ */
-  .previews {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 16px;
-  }
-  .preview {
-    background: rgba(0,0,0,0.3);
+  /* Preview */
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    flex: 1; padding: 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.04);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    min-height: 260px;
-    display: flex; flex-direction: column;
+    color: var(--text-dim); font-size: 13px; cursor: pointer;
+    transition: all .15s; font-family: inherit;
   }
-  .preview-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 14px;
-    font-size: 11px;
-    color: var(--text-faint);
-    border-bottom: 1px solid var(--border);
-    background: rgba(0,0,0,0.2);
-  }
-  .preview-header .tag {
-    padding: 2px 8px; border-radius: 10px;
-    background: rgba(255,255,255,0.06);
-    font-size: 10px; color: var(--text-dim);
-  }
-  .preview-canvas-wrap {
-    flex: 1;
+  .tab.active { background: rgba(129,140,248,0.15); border-color: var(--accent); color: var(--accent); }
+  .pv-box {
+    border-radius: var(--radius-md); overflow: hidden;
+    min-height: 380px;
     display: flex; align-items: center; justify-content: center;
-    padding: 8px;
-    position: relative;
+    padding: 8px; position: relative;
+    background: rgba(0,0,0,0.25);
   }
-  .preview canvas, .preview img {
-    max-width: 100%; max-height: 320px;
-    object-fit: contain;
-  }
-  .preview.transparent canvas {
+  .pv-box canvas { max-width: 100%; max-height: 520px; object-fit: contain; display: block; }
+  .pv-box.transparent {
+    background-color: #0a0a14;
     background-image:
-      linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%),
-      linear-gradient(-45deg, rgba(255,255,255,0.04) 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.04) 75%),
-      linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.04) 75%);
+      linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.05) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.05) 75%);
     background-size: 14px 14px;
     background-position: 0 0, 0 7px, 7px -7px, -7px 0px;
-    background-color: #0a0a14;
   }
-  .preview .placeholder {
-    color: var(--text-faint);
-    font-size: 13px;
-  }
+  .pv-meta { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-faint); }
+  .change-img { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; font-family: inherit; padding: 0; }
+  .change-img:hover { text-decoration: underline; }
 
-  /* ============ Controls ============ */
-  .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-top: 20px;
-  }
-  .ctrl {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-  }
-  .ctrl-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  /* Right controls */
+  .ctrl-group { margin-bottom: 16px; }
+  .ctrl-group:last-child { margin-bottom: 0; }
+  .ctrl-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
 
-  /* Color control */
   .color-row { display: flex; gap: 8px; align-items: center; }
-  .color-swatch-big {
-    width: 44px; height: 44px; border-radius: 10px;
+  .color-swatch {
+    width: 36px; height: 36px; border-radius: 8px;
     border: 2px solid var(--border-strong);
-    cursor: pointer; background: var(--accent);
-    transition: transform .15s, border-color .15s;
-    flex-shrink: 0;
-    position: relative;
-    overflow: hidden;
+    flex-shrink: 0; cursor: pointer;
   }
-  .color-swatch-big:hover { transform: scale(1.08); border-color: var(--accent); }
-  input[type="text"].hex {
-    flex: 1;
-    padding: 8px 12px; border-radius: 8px;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--border-strong);
+  .hex-input {
+    flex: 1; min-width: 0;
+    padding: 8px 10px; border-radius: 8px;
+    background: rgba(0,0,0,0.3); border: 1px solid var(--border-strong);
     color: var(--text);
-    font-family: "SF Mono", Consolas, monospace;
-    font-size: 13px;
-    text-transform: uppercase;
-    outline: none;
-    transition: border-color .15s;
+    font-family: "SF Mono", Consolas, monospace; font-size: 13px;
+    text-transform: uppercase; outline: none;
   }
-  input[type="text"].hex:focus { border-color: var(--accent); }
+  .hex-input:focus { border-color: var(--accent); }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border-strong);
+    color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--accent); }
+
   .preset-colors { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
   .preset-colors button {
-    width: 24px; height: 24px; border-radius: 6px;
-    border: 2px solid var(--border-strong);
-    cursor: pointer; padding: 0;
+    width: 22px; height: 22px; border-radius: 6px;
+    border: 2px solid var(--border-strong); cursor: pointer; padding: 0;
     transition: transform .15s, border-color .15s;
   }
   .preset-colors button:hover { transform: scale(1.15); border-color: var(--accent); }
 
-  /* HSL 调色盘 */
-  .palette {
-    margin-top: 12px;
-    display: none;
-    animation: fadeIn .15s ease;
-  }
+  /* HSL palette */
+  .palette { margin-top: 12px; display: none; }
   .palette.show { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .hsl-sv {
-    position: relative;
-    width: 100%; height: 120px;
-    border-radius: 8px;
-    cursor: crosshair;
-    border: 1px solid var(--border-strong);
-    margin-bottom: 8px;
-    overflow: hidden;
+    position: relative; width: 100%; height: 110px;
+    border-radius: 8px; cursor: crosshair;
+    border: 1px solid var(--border-strong); margin-bottom: 8px; overflow: hidden;
   }
   .hsl-sv-cursor {
-    position: absolute;
-    width: 14px; height: 14px;
-    border-radius: 50%;
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
     border: 2px solid white;
     box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
-    transform: translate(-50%, -50%);
-    pointer-events: none;
+    transform: translate(-50%, -50%); pointer-events: none;
   }
   .hsl-hue {
-    width: 100%; height: 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    background: linear-gradient(to right,
-      #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%,
-      #0000ff 67%, #ff00ff 83%, #ff0000 100%);
-    border: 1px solid var(--border-strong);
-    margin-bottom: 4px;
-    position: relative;
+    width: 100%; height: 12px; border-radius: 6px; cursor: pointer;
+    background: linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+    border: 1px solid var(--border-strong); position: relative;
   }
   .hsl-hue-cursor {
-    position: absolute; top: -2px;
-    width: 14px; height: 16px;
-    border-radius: 3px;
-    background: white;
-    border: 1px solid rgba(0,0,0,0.3);
-    transform: translateX(-50%);
-    pointer-events: none;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  }
-  .palette-toggle {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: 6px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid var(--border-strong);
-    color: var(--text-dim);
-    font-size: 12px;
-    cursor: pointer;
-    transition: all .15s;
-  }
-  .palette-toggle:hover { background: rgba(255,255,255,0.10); color: var(--text); }
-  .palette-toggle.active { color: var(--accent); border-color: var(--accent); }
-
-  /* 吸管 */
-  .eyedropper-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: 6px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid var(--border-strong);
-    color: var(--text-dim);
-    font-size: 12px;
-    cursor: pointer;
-    transition: all .15s;
-  }
-  .eyedropper-btn:hover { background: rgba(255,255,255,0.10); color: var(--text); }
-  .eyedropper-btn.active {
-    background: rgba(129,140,248,0.15);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .eyedropper-btn.active + .eyedropper-hint { display: block; }
-  .eyedropper-hint {
-    display: none;
-    font-size: 11px; color: var(--warning);
-    margin-top: 6px;
+    position: absolute; top: -2px; width: 14px; height: 16px; border-radius: 3px;
+    background: white; border: 1px solid rgba(0,0,0,0.3);
+    transform: translateX(-50%); pointer-events: none;
   }
 
-  /* Tooltip */
-  .has-tooltip { position: relative; cursor: help; }
-  .has-tooltip::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.9);
-    color: var(--text);
-    font-size: 11px;
-    padding: 6px 10px;
-    border-radius: 6px;
-    white-space: nowrap;
-    opacity: 0; visibility: hidden;
-    transition: opacity .15s;
-    pointer-events: none;
-    z-index: 10;
+  /* Segmented buttons */
+  .segmented { display: flex; gap: 6px; }
+  .segmented button {
+    flex: 1; padding: 7px 4px; border-radius: 8px;
+    background: rgba(255,255,255,0.04);
     border: 1px solid var(--border);
+    color: var(--text-dim); font-size: 12px; cursor: pointer;
+    font-family: inherit; transition: all .15s;
   }
-  .has-tooltip:hover::after { opacity: 1; visibility: visible; }
+  .segmented button.active { background: rgba(129,140,248,0.15); border-color: var(--accent); color: var(--accent); }
 
   /* Slider */
-  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
   input[type="range"] {
-    flex: 1;
-    height: 4px; border-radius: 2px;
+    flex: 1; height: 4px; border-radius: 2px;
     background: var(--border-strong);
-    -webkit-appearance: none; appearance: none;
-    outline: none;
+    -webkit-appearance: none; appearance: none; outline: none;
   }
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 16px; height: 16px; border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
+    background: var(--accent); cursor: pointer;
     box-shadow: 0 2px 8px var(--accent-glow);
-    transition: transform .15s;
   }
-  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
   .slider-val {
-    min-width: 40px;
-    text-align: center;
-    font-family: "SF Mono", Consolas, monospace;
-    font-size: 12px;
-    color: var(--accent);
-    padding: 2px 8px;
-    background: rgba(129,140,248,0.12);
-    border-radius: 6px;
+    min-width: 42px; text-align: center;
+    font-family: "SF Mono", Consolas, monospace; font-size: 12px;
+    color: var(--accent); padding: 2px 8px;
+    background: rgba(129,140,248,0.12); border-radius: 6px;
   }
 
-  /* Select */
-  select.ctrl-select {
-    width: 100%;
-    padding: 9px 12px; border-radius: 8px;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--border-strong);
-    color: var(--text);
-    font-size: 13px;
-    outline: none;
-    cursor: pointer;
+  /* Compact select */
+  select.compact-select {
+    width: 100%; padding: 8px 10px; border-radius: 8px;
+    background: rgba(0,0,0,0.3); border: 1px solid var(--border-strong);
+    color: var(--text); font-size: 13px; outline: none; cursor: pointer;
   }
-  select.ctrl-select:focus { border-color: var(--accent); }
+  select.compact-select:focus { border-color: var(--accent); }
 
-  /* ============ Buttons ============ */
-  .action-bar {
-    display: flex; gap: 10px; margin-top: 18px;
-  }
-  button.btn {
-    flex: 1;
-    padding: 12px 20px;
-    border-radius: 10px;
-    border: none;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all .2s cubic-bezier(.4,0,.2,1);
-    font-family: inherit;
+  /* Action buttons */
+  .btn {
+    width: 100%; padding: 11px; border-radius: 10px;
+    border: none; font-size: 14px; font-weight: 500; cursor: pointer;
+    font-family: inherit; margin-bottom: 8px;
     display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all .2s;
   }
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: white;
-    box-shadow: 0 4px 16px var(--accent-glow);
-  }
-  .btn-primary:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 24px var(--accent-glow);
-  }
-  .btn-primary:active:not(:disabled) { transform: translateY(0); }
-  .btn-secondary {
-    background: rgba(255,255,255,0.06);
-    color: var(--text);
-    border: 1px solid var(--border-strong);
-  }
-  .btn-secondary:hover:not(:disabled) {
-    background: rgba(255,255,255,0.10);
-    border-color: var(--border-strong);
-  }
-  .btn-download {
-    background: linear-gradient(135deg, #059669, #10b981);
-    color: white;
-    box-shadow: 0 4px 16px rgba(16,185,129,0.3);
-  }
-  .btn-download:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 24px rgba(16,185,129,0.4);
-  }
-  button.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn:last-child { margin-bottom: 0; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; box-shadow: 0 4px 16px var(--accent-glow); }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); }
+  .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+  .btn-download { background: linear-gradient(135deg, #059669, #10b981); color: white; box-shadow: 0 4px 16px rgba(16,185,129,0.3); }
+  .btn-download:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-  /* ============ Status ============ */
-  .status-wrap { margin-top: 14px; }
+  /* Status */
   .status {
-    display: none;
-    padding: 12px 16px;
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    align-items: center;
-    gap: 10px;
+    display: none; margin-top: 12px;
+    padding: 10px 14px; border-radius: var(--radius-md);
+    font-size: 13px; align-items: center; gap: 10px;
   }
   .status.busy { background: rgba(129,140,248,0.12); color: var(--accent); border: 1px solid rgba(129,140,248,0.25); display: flex; }
-  .status.ok   { background: rgba(52,211,153,0.10); color: var(--success); border: 1px solid rgba(52,211,153,0.25); display: flex; }
-  .status.err  { background: rgba(248,113,113,0.12); color: var(--error); border: 1px solid rgba(248,113,113,0.25); display: flex; }
+  .status.ok { background: rgba(52,211,153,0.10); color: var(--success); border: 1px solid rgba(52,211,153,0.25); display: flex; }
+  .status.err { background: rgba(248,113,113,0.12); color: var(--error); border: 1px solid rgba(248,113,113,0.25); display: flex; }
   .spinner {
     width: 14px; height: 14px; border-radius: 50%;
     border: 2px solid currentColor; border-top-color: transparent;
@@ -430,329 +251,245 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ============ Responsive ============ */
-  @media (max-width: 640px) {
-    .previews { grid-template-columns: 1fr; }
-    .controls { grid-template-columns: 1fr; }
-    .action-bar { flex-wrap: wrap; }
-    .action-bar .btn { flex: 1 1 40%; }
+  @media (max-width: 900px) {
+    .workbench { grid-template-columns: 1fr; }
+    .pv-box { min-height: 260px; }
   }
 </style>
 </head>
 <body>
 
 <div class="app">
-  <!-- Header -->
   <div class="header">
-    <div class="logo">
-      <div class="logo-icon">✏️</div>
-    </div>
+    <div class="logo"><div class="logo-icon">✏️</div></div>
     <h1>线稿导出器</h1>
-    <p class="tagline">AI 自动描边 · 透明背景 PNG · 自定义描边颜色</p>
+    <p class="tagline">AI 自动描边 · 透明背景 · 自定义颜色和粗细</p>
   </div>
 
-  <!-- Upload -->
-  <label class="drop" id="drop">
-    <span class="drop-emoji">📷</span>
-    <span class="drop-text">点击选择图片 或 拖拽到这里</span>
-    <span class="drop-hint">支持 PNG / JPG / WEBP · 建议人物立绘或头像</span>
-    <input type="file" id="file" accept="image/*">
-  </label>
+  <div class="workbench">
+    <!-- 左：图片区 -->
+    <div>
+      <label class="drop" id="drop">
+        <span class="drop-emoji">📷</span>
+        <span class="drop-text">点击选择图片 或 拖拽到这里</span>
+        <span class="drop-hint">PNG / JPG / WEBP · 建议人物立绘或头像</span>
+        <input type="file" id="file" accept="image/*">
+      </label>
 
-  <!-- Previews -->
-  <div class="previews">
-    <div class="preview">
-      <div class="preview-header">
-        <span>原图</span>
-        <span class="tag" id="srcInfo">-</span>
-      </div>
-      <div class="preview-canvas-wrap">
-        <canvas id="srcCanvas"></canvas>
-      </div>
-    </div>
-    <div class="preview transparent">
-      <div class="preview-header">
-        <span>线稿预览</span>
-        <span class="tag" id="outInfo">-</span>
-      </div>
-      <div class="preview-canvas-wrap">
-        <canvas id="outCanvas"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- Controls -->
-  <div class="controls">
-    <div class="ctrl">
-      <div class="ctrl-label">描边颜色</div>
-      <div class="color-row" style="gap:10px;">
-        <div class="color-swatch-big" id="colorSwatch" title="点击展开调色盘"></div>
-        <input type="text" id="colorHex" class="hex" value="#FFFFFF" maxlength="7" style="flex:1;">
-        <input type="color" id="nativeColor" value="#FFFFFF" style="width:32px;height:32px;border:2px solid var(--border-strong);border-radius:8px;cursor:pointer;background:transparent;padding:0;">
-        <button class="palette-toggle" id="paletteToggle" type="button" style="margin:0;white-space:nowrap;">🎨 调色盘</button>
-      </div>
-
-      <div class="preset-colors">
-        <button style="background:#ffffff;border-color:#666" title="白" data-c="#ffffff"></button>
-        <button style="background:#000000" title="黑" data-c="#000000"></button>
-        <button style="background:#ff4444" title="红" data-c="#ff4444"></button>
-        <button style="background:#ff8822" title="橙" data-c="#ff8822"></button>
-        <button style="background:#ffcc33" title="黄" data-c="#ffcc33"></button>
-        <button style="background:#88dd44" title="黄绿" data-c="#88dd44"></button>
-        <button style="background:#22cc66" title="绿" data-c="#22cc66"></button>
-        <button style="background:#22ccaa" title="青绿" data-c="#22ccaa"></button>
-        <button style="background:#33aaff" title="蓝" data-c="#33aaff"></button>
-        <button style="background:#5566ff" title="靛" data-c="#5566ff"></button>
-        <button style="background:#9955ff" title="紫" data-c="#9955ff"></button>
-        <button style="background:#ee55dd" title="粉紫" data-c="#ee55dd"></button>
-        <button style="background:#ff6699" title="粉" data-c="#ff6699"></button>
-      </div>
-
-      <!-- HSL 调色盘 -->
-      <div class="palette" id="palette">
-        <div class="hsl-sv" id="hslSv">
-          <div class="hsl-sv-cursor" id="hslSvCursor"></div>
+      <div class="card" id="pvCard" style="display:none;">
+        <div class="tabs">
+          <button class="tab active" data-tab="src">原图</button>
+          <button class="tab" data-tab="out">线稿（透明底）</button>
         </div>
-        <div class="hsl-hue" id="hslHue">
-          <div class="hsl-hue-cursor" id="hslHueCursor"></div>
+        <div class="pv-box" id="pvBox">
+          <canvas id="srcCanvas"></canvas>
+          <canvas id="outCanvas" style="display:none;"></canvas>
+        </div>
+        <div class="pv-meta">
+          <span id="imgInfo">-</span>
+          <button class="change-img" id="changeImg">换一张图</button>
         </div>
       </div>
     </div>
 
-    <div class="ctrl">
-      <div class="ctrl-label has-tooltip" data-tip="AI 推理的最大像素尺寸。小图选大(4096)放大出细线条，大图选小(1024)省时间">最大边</div>
-      <select id="skSize" class="ctrl-select">
-        <option value="0">原图大小</option>
-        <option value="1024">1024px（省时间）</option>
-        <option value="2048" selected>2048px（推荐）</option>
-        <option value="3072">3072px</option>
-        <option value="4096">4096px（小图放大出细线条）</option>
-      </select>
-    </div>
-
-    <div class="ctrl" style="grid-column: 1 / -1;">
-      <div class="ctrl-label">线稿强度 <span id="threshLabel" style="color:var(--text-faint);font-size:11px;">10%</span></div>
-      <div class="slider-row">
-        <input type="range" id="thresh" min="0" max="30" value="10" title="线条保留阈值（越小线条越多，越大只保最粗主线）">
-        <span class="slider-val" id="threshVal">10%</span>
+    <!-- 右：功能区 -->
+    <div class="card">
+      <!-- 颜色 -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">线条颜色</div>
+        <div class="color-row">
+          <div class="color-swatch" id="colorSwatch" title="点这里展开调色盘"></div>
+          <input type="text" id="colorHex" class="hex-input" value="#FFFFFF" maxlength="7">
+          <button class="icon-btn" id="eyedropperBtn" title="吸取屏幕上任意位置的颜色">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.64 13L11 2.36c-.55-.55-1.44-.55-1.99 0L2.36 9c-.55.55-.55 1.44 0 1.99L13 21.64c.55.55 1.44.55 1.99 0l6.65-6.65c.55-.55.55-1.44 0-1.99z"/>
+              <line x1="7" y1="17" x2="3" y2="21"/>
+            </svg>
+          </button>
+        </div>
+        <div class="preset-colors">
+          <button style="background:#ffffff" title="白" data-c="#ffffff"></button>
+          <button style="background:#000000" title="黑" data-c="#000000"></button>
+          <button style="background:#ff4444" title="红" data-c="#ff4444"></button>
+          <button style="background:#ff8822" title="橙" data-c="#ff8822"></button>
+          <button style="background:#ffcc33" title="黄" data-c="#ffcc33"></button>
+          <button style="background:#22cc66" title="绿" data-c="#22cc66"></button>
+          <button style="background:#33aaff" title="蓝" data-c="#33aaff"></button>
+          <button style="background:#5566ff" title="靛蓝" data-c="#5566ff"></button>
+          <button style="background:#9955ff" title="紫" data-c="#9955ff"></button>
+          <button style="background:#ff6699" title="粉" data-c="#ff6699"></button>
+        </div>
+        <div class="palette" id="palette">
+          <div class="hsl-sv" id="hslSv"><div class="hsl-sv-cursor" id="hslSvCursor"></div></div>
+          <div class="hsl-hue" id="hslHue"><div class="hsl-hue-cursor" id="hslHueCursor"></div></div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Action -->
-  <div class="action-bar">
-    <button class="btn btn-primary" id="goBtn" disabled title="首次生成：上传图片后点这里">
-      ✨ AI 生成线稿
-    </button>
-    <button class="btn btn-secondary has-tooltip" id="recolorBtn" disabled data-tip="已生成线稿后，换颜色/强度秒刷新，不重跑 AI">
-      🔄 重新渲染
-    </button>
-    <button class="btn btn-download" id="dlBtn" disabled>
-      💾 下载 PNG
-    </button>
-  </div>
+      <!-- 描边粗细 -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">描边粗细</div>
+        <div class="segmented" id="thicknessSeg">
+          <button data-r="0">细</button>
+          <button data-r="1" class="active">标准</button>
+          <button data-r="2">粗</button>
+          <button data-r="3">特粗</button>
+        </div>
+      </div>
 
-  <!-- Status -->
-  <div class="status-wrap">
-    <div class="status" id="status">
-      <span class="spinner"></span>
-      <span id="statusText"></span>
+      <!-- 细节丰富度（原线稿强度） -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">细节丰富度 <span style="text-transform:none;letter-spacing:0;">（越高线条越多越精细）</span></div>
+        <div class="slider-row">
+          <input type="range" id="detail" min="0" max="100" value="67">
+          <span class="slider-val" id="detailVal">67%</span>
+        </div>
+      </div>
+
+      <!-- 输出尺寸（原最大边） -->
+      <div class="ctrl-group">
+        <div class="ctrl-label">输出图片尺寸</div>
+        <select id="outSize" class="compact-select">
+          <option value="0">和原图一样大</option>
+          <option value="1024">标准 · 1024px（生成快）</option>
+          <option value="2048" selected>高清 · 2048px（推荐）</option>
+          <option value="3072">超清 · 3072px</option>
+          <option value="4096">极清 · 4096px（小图也能出精细线条）</option>
+        </select>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="ctrl-group" style="margin-bottom:0;">
+        <button class="btn btn-primary" id="goBtn" disabled>✨ 生成线稿</button>
+        <button class="btn btn-secondary" id="recolorBtn" disabled>🔄 重新渲染</button>
+        <button class="btn btn-download" id="dlBtn" disabled>💾 下载 PNG（透明底）</button>
+      </div>
+
+      <div class="status" id="status">
+        <span class="spinner"></span>
+        <span id="statusText"></span>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-// ============ onnxruntime 加载（动态 <script>，挂 window.ort，UMD） ============
-const ORT_CDN_BASES = [
-  'ort/',
-  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/',
-  'https://unpkg.com/onnxruntime-web@1.19.2/dist/'
-];
-let ortLoadPromise = null;
-
+// ============ onnxruntime 加载 ============
+const ORT_Bases = ['ort/', 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/', 'https://unpkg.com/onnxruntime-web@1.19.2/dist/'];
+let ortPromise = null;
 function loadOrt() {
   if (window.ort) return Promise.resolve(window.ort);
-  if (ortLoadPromise) return ortLoadPromise;
-  ortLoadPromise = (async () => {
+  if (ortPromise) return ortPromise;
+  ortPromise = (async () => {
     let lastErr = null;
-    for (const base of ORT_CDN_BASES) {
+    for (const base of ORT_Bases) {
       try {
         await new Promise((resolve, reject) => {
           const s = document.createElement('script');
-          s.src = base + 'ort.min.js';
-          s.async = true;
-          const timer = setTimeout(() => {
-            s.onerror = null; s.onload = null;
-            reject(new Error('加载超时'));
-          }, 15000);
+          s.src = base + 'ort.min.js'; s.async = true;
+          const timer = setTimeout(() => reject(new Error('加载超时')), 15000);
           s.onload = () => { clearTimeout(timer); resolve(); };
-          s.onerror = () => { clearTimeout(timer); reject(new Error('HTTP 加载失败')); };
+          s.onerror = () => { clearTimeout(timer); reject(new Error('HTTP 失败')); };
           document.head.appendChild(s);
         });
         await new Promise(r => setTimeout(r, 50));
         if (window.ort) {
           window.ort.env.wasm.wasmPaths = new URL(base, location.href).href;
           window.ort.env.wasm.simd = true;
-          if (self.crossOriginIsolated && (navigator.hardwareConcurrency || 1) > 2) {
-            window.ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency - 1);
-          } else {
-            window.ort.env.wasm.numThreads = 1;
-          }
-          console.log('ort loaded from', base, '→ wasmPaths=' + ort.env.wasm.wasmPaths, 'threads=' + ort.env.wasm.numThreads);
+          window.ort.env.wasm.numThreads = (self.crossOriginIsolated && (navigator.hardwareConcurrency||1) > 2)
+            ? Math.min(4, navigator.hardwareConcurrency - 1) : 1;
           return window.ort;
         }
-        throw new Error('window.ort 未定义（UMD 可能初始化失败）');
+        throw new Error('ort 初始化失败');
       } catch (e) {
         lastErr = e;
-        console.warn('ORT 源失败 (' + base + '):', e.message);
-        document.querySelectorAll('script[src*="onnxruntime"], script[src*="ort.min"]').forEach(s => s.remove());
+        document.querySelectorAll('script[src*="ort.min"]').forEach(s => s.remove());
       }
     }
-    ortLoadPromise = null;
-    throw new Error('onnxruntime-web 加载失败：' + (lastErr?.message || '未知') + '（请用本地服务器 serve.ps1 访问）');
+    ortPromise = null;
+    throw new Error('AI 引擎加载失败，请用本地服务器 serve.ps1 打开');
   })();
-  return ortLoadPromise;
+  return ortPromise;
 }
 
 // ============ 模型加载 ============
 const MODEL_SOURCES = [
-  (name) => `https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/model/${name}.onnx`,
-  (name) => `https://raw.githubusercontent.com/Zafkiel010/wt-sight-studio/main/model/${name}.onnx`,
-  (name) => `model/${name}.onnx`
+  name => `https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/model/${name}.onnx`,
+  name => `https://raw.githubusercontent.com/Zafkiel010/wt-sight-studio/main/model/${name}.onnx`,
+  name => `model/${name}.onnx`
 ];
-
-async function fetchModelWithProgress(name) {
-  let lastProgress = 0;
-  const tryFetch = async (url) => {
-    setStatus('加载模型 ' + name + ' … (' + url.split('/')[2] + ')', 'busy');
+async function fetchModel(name) {
+  let lastPct = -5;
+  const one = async (url) => {
+    const host = url.split('/')[2] || '本地';
+    setStatus('下载 AI 模型（' + host + '）…', 'busy');
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const total = +resp.headers.get('Content-Length');
     if (!total) return resp.arrayBuffer();
     const reader = resp.body.getReader();
-    const chunks = []; let received = 0;
-    const stallTimer = setInterval(() => {
-      if (received === lastProgress) { clearInterval(stallTimer); throw new Error('15秒无进度'); }
-      lastProgress = received;
-    }, 15000);
+    const chunks = []; let got = 0, stalled = 0;
+    const timer = setInterval(() => {
+      stalled++;
+      if (stalled >= 2) { clearInterval(timer); throw new Error('网络太慢'); }
+    }, 10000);
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      chunks.push(value); received += value.length;
-      const pct = Math.round(received / total * 100);
-      if (pct - lastProgress >= 5) {
-        lastProgress = pct;
-        setStatus('加载模型 ' + name + ' … ' + pct + '% (' + Math.round(received/1024/1024*10)/10 + '/' + Math.round(total/1024/1024*10)/10 + ' MB)', 'busy');
-      }
+      stalled = 0; chunks.push(value); got += value.length;
+      const pct = Math.round(got / total * 100);
+      if (pct - lastPct >= 10) { lastPct = pct; setStatus('下载 AI 模型 … ' + pct + '%', 'busy'); }
     }
-    clearInterval(stallTimer);
+    clearInterval(timer);
     return new Blob(chunks).arrayBuffer();
   };
   let lastErr = null;
-  for (const mkUrl of MODEL_SOURCES) {
-    try { return await tryFetch(mkUrl(name)); } catch (e) { lastErr = e; console.warn('模型源失败:', e.message); }
+  for (const mk of MODEL_SOURCES) {
+    try { return await one(mk(name)); } catch (e) { lastErr = e; }
   }
-  throw new Error('模型加载失败：' + lastErr.message + '（国内网络请用本地服务器 serve.ps1）');
+  throw new Error('模型下载失败：' + (lastErr?.message||'') + '（国内网络建议用本地服务器 serve.ps1）');
 }
 
 // ============ DOM ============
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
+const pvCard = document.getElementById('pvCard');
+const pvBox = document.getElementById('pvBox');
 const srcCanvas = document.getElementById('srcCanvas');
 const outCanvas = document.getElementById('outCanvas');
-const srcInfo = document.getElementById('srcInfo');
-const outInfo = document.getElementById('outInfo');
+const imgInfo = document.getElementById('imgInfo');
+const changeImg = document.getElementById('changeImg');
 const colorSwatch = document.getElementById('colorSwatch');
 const colorHex = document.getElementById('colorHex');
-const paletteToggle = document.getElementById('paletteToggle');
+const eyedropperBtn = document.getElementById('eyedropperBtn');
 const palette = document.getElementById('palette');
 const hslSv = document.getElementById('hslSv');
 const hslSvCursor = document.getElementById('hslSvCursor');
 const hslHue = document.getElementById('hslHue');
 const hslHueCursor = document.getElementById('hslHueCursor');
-const nativeColor = document.getElementById('nativeColor');
-const thresh = document.getElementById('thresh');
-const threshLabel = document.getElementById('threshLabel');
-const threshVal = document.getElementById('threshVal');
-const skSize = document.getElementById('skSize');
+const thicknessSeg = document.getElementById('thicknessSeg');
+const detail = document.getElementById('detail');
+const detailVal = document.getElementById('detailVal');
+const outSize = document.getElementById('outSize');
 const goBtn = document.getElementById('goBtn');
 const recolorBtn = document.getElementById('recolorBtn');
 const dlBtn = document.getElementById('dlBtn');
 const status = document.getElementById('status');
 const statusText = document.getElementById('statusText');
 
-let img = null;
-let rawSketch = null;
-let sketchHW = null;
+let img = null, rawSketch = null, sketchHW = null;
 let currentColor = '#FFFFFF';
-let currentHSL = { h: 0.0, s: 0.0, l: 1.0 }; // 白
+let currentHSL = { h: 0, s: 0, l: 1 };
+let thicknessR = 1;
 
-// ============ 颜色工具 ============
-function hexToHSL(hex) {
-  const r = parseInt(hex.slice(1,3), 16) / 255;
-  const g = parseInt(hex.slice(3,5), 16) / 255;
-  const b = parseInt(hex.slice(5,7), 16) / 255;
-  const max = Math.max(r,g,b), min = Math.min(r,g,b);
-  let h = 0, s = 0; const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) { case r: h = (g - b) / d + (g < b ? 6 : 0); break; case g: h = (b - r) / d + 2; break; case b: h = (r - g) / d + 4; }
-    h /= 6;
-  }
-  return { h, s, l };
-}
-function hslToHex(h, s, l) {
-  let r, g, b;
-  if (s === 0) { r = g = b = l; }
-  else {
-    const hue2rgb = (p, q, t) => {
-      if (t < 0) t += 1; if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1/3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
-  }
-  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
-  return '#' + toHex(r) + toHex(g) + toHex(b);
-}
-function updateColorDisplay() {
-  colorSwatch.style.background = currentColor;
-  colorHex.value = currentColor.toUpperCase();
-  // 更新 HSL 调色盘位置
-  const rect = hslSv.getBoundingClientRect();
-  hslSv.style.background = `linear-gradient(to right, white, hsl(${currentHSL.h*360},100%,50%)), linear-gradient(to top, black, transparent)`;
-  hslSvCursor.style.left = (currentHSL.s * 100) + '%';
-  hslSvCursor.style.top = ((1 - currentHSL.l) * 100) + '%';
-  hslHueCursor.style.left = (currentHSL.h * 100) + '%';
-}
-function setColor(hex) {
-  currentColor = hex;
-  currentHSL = hexToHSL(hex);
-  nativeColor.value = hex;
-  updateColorDisplay();
-  if (rawSketch) renderLineart();
-}
-
-// ============ 状态 ============
-const statusSpinner = document.querySelector('#status .spinner');
+// ============ 状态条 ============
+const spinnerEl = status.querySelector('.spinner');
 function setStatus(msg, type = 'busy') {
-  status.style.display = 'flex';
   status.className = 'status ' + type;
   statusText.textContent = msg;
-  // ok/err 隐藏 spinner，只有 busy 才转
-  statusSpinner.style.display = (type === 'busy') ? '' : 'none';
+  spinnerEl.style.display = (type === 'busy') ? '' : 'none';
 }
-function clearStatus() { status.style.display = 'none'; }
 
-// ============ 文件上传 ============
-drop.addEventListener('click', () => fileInput.click());
+// ============ 上传 ============
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
 drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
 drop.addEventListener('drop', e => {
@@ -760,186 +497,259 @@ drop.addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+changeImg.addEventListener('click', () => fileInput.click());
 
 function handleFile(f) {
   const im = new Image();
   im.onload = () => {
     img = im;
-    srcInfo.textContent = im.width + '×' + im.height;
     srcCanvas.width = im.width; srcCanvas.height = im.height;
     srcCanvas.getContext('2d').drawImage(im, 0, 0);
+    imgInfo.textContent = im.width + ' × ' + im.height;
+    drop.style.display = 'none';
+    pvCard.style.display = '';
+    showTab('src');
     goBtn.disabled = false;
-    recolorBtn.disabled = true;
-    dlBtn.disabled = true;
-    clearStatus();
-    outCanvas.width = outCanvas.height = 1;
-    outInfo.textContent = '-';
+    recolorBtn.disabled = true; dlBtn.disabled = true;
+    status.className = 'status';
   };
   im.src = URL.createObjectURL(f);
 }
 
-// ============ 颜色控制 ============
-colorSwatch.addEventListener('click', () => {
-  palette.classList.toggle('show');
-  paletteToggle.classList.toggle('active');
+// ============ 预览 tab ============
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => showTab(t.dataset.tab));
 });
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  srcCanvas.style.display = name === 'src' ? '' : 'none';
+  outCanvas.style.display = name === 'out' ? '' : 'none';
+  pvBox.classList.toggle('transparent', name === 'out');
+}
+
+// ============ 颜色工具 ============
+function hexToHSL(hex) {
+  const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h=0,s=0; const l=(max+min)/2;
+  if (max!==min) {
+    const d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    if (max===r) h=(g-b)/d+(g<b?6:0);
+    else if (max===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h/=6;
+  }
+  return {h,s,l};
+}
+function hslToHex(h,s,l) {
+  let r,g,b;
+  if (s===0) r=g=b=l;
+  else {
+    const h2=(p,q,t)=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; };
+    const q=l<0.5?l*(1+s):l+s-l*s, p=2*l-q;
+    r=h2(p,q,h+1/3); g=h2(p,q,h); b=h2(p,q,h-1/3);
+  }
+  const x=v=>Math.round(v*255).toString(16).padStart(2,'0');
+  return '#'+x(r)+x(g)+x(b);
+}
+function updateColorUI() {
+  colorSwatch.style.background = currentColor;
+  colorHex.value = currentColor.toUpperCase();
+  hslSv.style.background =
+    `linear-gradient(to right, white, hsl(${currentHSL.h*360},100%,50%)), linear-gradient(to top, black, transparent)`;
+  hslSvCursor.style.left = (currentHSL.s*100)+'%';
+  hslSvCursor.style.top = ((1-currentHSL.l)*100)+'%';
+  hslHueCursor.style.left = (currentHSL.h*100)+'%';
+}
+function setColor(hex) {
+  currentColor = hex;
+  currentHSL = hexToHSL(hex);
+  updateColorUI();
+  if (rawSketch) renderLineart();
+}
+
+colorSwatch.addEventListener('click', () => palette.classList.toggle('show'));
 colorHex.addEventListener('change', () => {
   let v = colorHex.value.trim();
-  if (!v.startsWith('#')) v = '#' + v;
+  if (!v.startsWith('#')) v='#'+v;
   if (/^#[0-9a-fA-F]{6}$/.test(v)) setColor(v);
   else colorHex.value = currentColor.toUpperCase();
 });
-document.querySelectorAll('.preset-colors button').forEach(b => {
-  b.addEventListener('click', () => setColor(b.dataset.c));
-});
+document.querySelectorAll('.preset-colors button').forEach(b =>
+  b.addEventListener('click', () => setColor(b.dataset.c)));
 
-// ============ HSL 调色盘 ============
-paletteToggle.addEventListener('click', () => {
-  palette.classList.toggle('show');
-  paletteToggle.classList.toggle('active');
-});
-function hslSvHandle(e) {
-  const rect = hslSv.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-  currentHSL.s = Math.max(0, Math.min(1, x));
-  currentHSL.l = Math.max(0, Math.min(1, 1 - y));
-  setColor(hslToHex(currentHSL.h, currentHSL.s, currentHSL.l));
+// HSL 调色盘交互
+function svAt(e) {
+  const r = hslSv.getBoundingClientRect();
+  currentHSL.s = Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  currentHSL.l = Math.max(0,Math.min(1,1-(e.clientY-r.top)/r.height));
+  setColor(hslToHex(currentHSL.h,currentHSL.s,currentHSL.l));
 }
-function hslHueHandle(e) {
-  const rect = hslHue.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  currentHSL.h = Math.max(0, Math.min(1, x));
-  setColor(hslToHex(currentHSL.h, currentHSL.s, currentHSL.l));
+function hueAt(e) {
+  const r = hslHue.getBoundingClientRect();
+  currentHSL.h = Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  setColor(hslToHex(currentHSL.h,currentHSL.s,currentHSL.l));
 }
-hslSv.addEventListener('mousedown', e => { hslSvHandle(e); window._hslSvDrag = true; });
-hslHue.addEventListener('mousedown', e => { hslHueHandle(e); window._hslHueDrag = true; });
-window.addEventListener('mousemove', e => {
-  if (window._hslSvDrag) hslSvHandle(e);
-  if (window._hslHueDrag) hslHueHandle(e);
+hslSv.addEventListener('mousedown', e => { svAt(e); window._svD=true; });
+hslHue.addEventListener('mousedown', e => { hueAt(e); window._hD=true; });
+window.addEventListener('mousemove', e => { if(window._svD)svAt(e); if(window._hD)hueAt(e); });
+window.addEventListener('mouseup', () => { window._svD=window._hD=false; });
+
+// ============ 全屏吸管（EyeDropper API） ============
+eyedropperBtn.addEventListener('click', async () => {
+  if (!('EyeDropper' in window)) {
+    setStatus('你的浏览器不支持屏幕取色，请使用 Chrome 或 Edge 浏览器', 'err');
+    return;
+  }
+  try {
+    const res = await new EyeDropper().open();
+    let hex = res.sRGBHex || '#FFFFFF';
+    if (!hex.startsWith('#')) hex = '#'+hex;
+    setColor(hex);
+    setStatus('取色成功：'+hex.toUpperCase(), 'ok');
+  } catch (e) {
+    // 用户取消，不提示
+  }
 });
-window.addEventListener('mouseup', () => { window._hslSvDrag = false; window._hslHueDrag = false; });
 
-// ============ 原生系统取色器（完全无全屏/放大镜） ============
-nativeColor.addEventListener('input', () => setColor(nativeColor.value));
+// ============ 描边粗细 ============
+thicknessSeg.querySelectorAll('button').forEach(b => {
+  b.addEventListener('click', () => {
+    thicknessR = parseInt(b.dataset.r);
+    thicknessSeg.querySelectorAll('button').forEach(x => x.classList.toggle('active', x===b));
+    if (rawSketch) renderLineart();
+  });
+});
 
-// ============ 强度滑块 ============
-thresh.addEventListener('input', () => {
-  threshLabel.textContent = thresh.value + '%';
-  threshVal.textContent = thresh.value + '%';
+// ============ 细节丰富度 ============
+detail.addEventListener('input', () => {
+  detailVal.textContent = detail.value+'%';
   if (rawSketch) renderLineart();
 });
 
-// ============ 主按钮 ============
-goBtn.addEventListener('click', generateLineart);
+// ============ 生成 ============
+goBtn.addEventListener('click', generate);
 recolorBtn.addEventListener('click', () => { if (rawSketch) renderLineart(); });
 dlBtn.addEventListener('click', () => {
   outCanvas.toBlob(blob => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    a.download = 'lineart_' + ts + '.png';
+    a.download = 'lineart_'+Date.now()+'.png';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
   }, 'image/png');
 });
 
-// ============ 生成线稿 ============
-async function generateLineart() {
+async function generate() {
   if (!img) return;
   goBtn.disabled = true;
   try {
-    const size = parseInt(skSize.value);
-    let W = img.width, H = img.height;
-    const maxSide = size > 0 ? size : Math.max(W, H);
-    const k = maxSide / Math.max(W, H);
-    W = Math.max(8, Math.round(W * k / 8) * 8);
-    H = Math.max(8, Math.round(H * k / 8) * 8);
+    let W=img.width, H=img.height;
+    const maxSide = parseInt(outSize.value) || Math.max(W,H);
+    const k = maxSide/Math.max(W,H);
+    W = Math.max(8,Math.round(W*k/8)*8);
+    H = Math.max(8,Math.round(H*k/8)*8);
 
-    setStatus('预处理 ' + W + '×' + H + ' …', 'busy');
+    setStatus('预处理图片 '+W+'×'+H+' …', 'busy');
     const c = document.createElement('canvas');
-    c.width = W; c.height = H;
+    c.width=W; c.height=H;
     const g = c.getContext('2d');
-    g.imageSmoothingEnabled = true;
-    g.imageSmoothingQuality = 'high';
-    g.drawImage(img, 0, 0, W, H);
-    const id = g.getImageData(0, 0, W, H);
-    const d = id.data, px = W * H;
-    const rgb = new Float32Array(3 * px);
-    for (let i = 0, p = 0; p < px; p++, i += 4) {
-      rgb[p] = d[i] / 255;
-      rgb[p + px] = d[i + 1] / 255;
-      rgb[p + 2 * px] = d[i + 2] / 255;
+    g.imageSmoothingQuality='high';
+    g.drawImage(img,0,0,W,H);
+    const id = g.getImageData(0,0,W,H), d=id.data, px=W*H;
+    const rgb = new Float32Array(3*px);
+    for (let i=0,p=0;p<px;p++,i+=4) {
+      rgb[p]=d[i]/255; rgb[p+px]=d[i+1]/255; rgb[p+2*px]=d[i+2]/255;
     }
 
-    setStatus('加载 AI 模型（首次约需下载 17MB）…', 'busy');
-    const ortMod = await loadOrt();
-    const bytes = await fetchModelWithProgress('line-drawings');
-    const sess = await ortMod.InferenceSession.create(bytes, {
-      executionProviders: ['wasm'], graphOptimizationLevel: 'all'
-    });
+    const ort = await loadOrt();
+    const bytes = await fetchModel('line-drawings');
+    const sess = await ort.InferenceSession.create(bytes, { executionProviders:['wasm'], graphOptimizationLevel:'all' });
 
-    setStatus('AI 推理中（' + W + '×' + H + '）…', 'busy');
-    await new Promise(r => setTimeout(r, 30));
-    const feeds = {}; feeds[sess.inputNames[0]] = new ortMod.Tensor('float32', rgb, [1, 3, H, W]);
+    setStatus('AI 正在描线（'+W+'×'+H+'）…', 'busy');
+    await new Promise(r=>setTimeout(r,30));
+    const feeds = {}; feeds[sess.inputNames[0]] = new ort.Tensor('float32',rgb,[1,3,H,W]);
     const out = await sess.run(feeds);
-    const tn = sess.outputNames[0];
-    const dims = out[tn].dims;
-    const arr = out[tn].data;
-    const OH = dims[2], OW = dims[3];
-
+    const tn = sess.outputNames[0], arr = out[tn].data, dims = out[tn].dims;
     rawSketch = new Float32Array(arr.length);
-    for (let i = 0; i < arr.length; i++) rawSketch[i] = Math.max(0, Math.min(1, arr[i]));
-    sketchHW = { H: OH, W: OW };
+    for (let i=0;i<arr.length;i++) rawSketch[i]=Math.max(0,Math.min(1,arr[i]));
+    sketchHW = { H:dims[2], W:dims[3] };
 
     renderLineart();
-    setStatus('完成！' + OW + '×' + OH, 'ok');
-    recolorBtn.disabled = false;
-    dlBtn.disabled = false;
+    setStatus('完成！可以下载或继续调整颜色、粗细', 'ok');
+    recolorBtn.disabled=false; dlBtn.disabled=false;
   } catch (e) {
     console.error(e);
-    setStatus(e.message || e, 'err');
+    setStatus((e&&e.message)||String(e)||'未知错误', 'err');
   } finally {
-    goBtn.disabled = false;
+    goBtn.disabled=false;
   }
 }
 
-// ============ 渲染（透明背景 + 可改颜色） ============
+// ============ Alpha 膨胀（让线条变粗） ============
+function dilate(src, W, H, r) {
+  if (r<=0) return src;
+  const tmp = new Uint8ClampedArray(src.length);
+  // 横向：滑动窗口最大值
+  for (let y=0;y<H;y++) {
+    const base=y*W; const dq=[];
+    for (let x=0;x<W;x++) {
+      const ax=x+r;
+      if (ax<W) {
+        const v=src[base+ax];
+        while(dq.length && src[base+dq[dq.length-1]]<=v) dq.pop();
+        dq.push(ax);
+      }
+      while(dq[0]<x-r) dq.shift();
+      tmp[base+x]=src[base+dq[0]];
+    }
+  }
+  // 纵向
+  const out = new Uint8ClampedArray(src.length);
+  for (let x=0;x<W;x++) {
+    const dq=[];
+    for (let y=0;y<H;y++) {
+      const ay=y+r;
+      if (ay<H) {
+        const v=tmp[ay*W+x];
+        while(dq.length && tmp[dq[dq.length-1]*W+x]<=v) dq.pop();
+        dq.push(ay);
+      }
+      while(dq[0]<y-r) dq.shift();
+      out[y*W+x]=tmp[dq[0]*W+x];
+    }
+  }
+  return out;
+}
+
+// ============ 渲染：透明背景 + 线条颜色/粗细 ============
 function renderLineart() {
-  if (!rawSketch || !sketchHW) return;
-  const { H, W } = sketchHW;
-  const hex = currentColor.replace('#', '');
-  const R = parseInt(hex.substring(0, 2), 16);
-  const G = parseInt(hex.substring(2, 4), 16);
-  const B = parseInt(hex.substring(4, 6), 16);
-  const threshPct = parseInt(thresh.value);
-  const t = threshPct / 100; // 0~0.3
+  if (!rawSketch||!sketchHW) return;
+  const {H,W} = sketchHW;
+  const hex = currentColor.replace('#','');
+  const R=parseInt(hex.slice(0,2),16), G=parseInt(hex.slice(2,4),16), B=parseInt(hex.slice(4,6),16);
+  // 细节丰富度 67% → 阈值 t=(100-67)/100*0.3 ≈ 0.1
+  const t = (100-parseInt(detail.value))/100*0.3;
 
-  outCanvas.width = W;
-  outCanvas.height = H;
-  const g = outCanvas.getContext('2d');
-  const od = g.createImageData(W, H);
-  const dd = od.data;
-
-  // 模型输出：v 低=线条（暗），v 高=背景（亮）
-  // 所以先反转：inv = 1 - v → 线条变高，背景变低
-  for (let p = 0, i = 0; p < rawSketch.length; p++, i += 4) {
-    const v = 1 - rawSketch[p]; // ⬅️ 关键反转！
-    // 减阈值砍背景噪声
-    const clip = Math.max(0, v - t);
-    // 归一化到 0~1
-    const alpha = Math.round(clip / (1 - t) * 255);
-    dd[i]     = R;
-    dd[i + 1] = G;
-    dd[i + 2] = B;
-    dd[i + 3] = Math.max(0, Math.min(255, alpha));
+  // 基础 alpha（模型输出 v 低=线条 → 1-v 反转）
+  const base = new Uint8ClampedArray(rawSketch.length);
+  for (let i=0;i<rawSketch.length;i++) {
+    const v = Math.max(0, (1-rawSketch[i]) - t) / (1-t);
+    base[i] = Math.max(0, Math.min(255, Math.round(v*255)));
   }
-  g.putImageData(od, 0, 0);
-  outInfo.textContent = W + '×' + H;
+  const alpha = dilate(base, W, H, thicknessR);
+
+  outCanvas.width=W; outCanvas.height=H;
+  const g = outCanvas.getContext('2d');
+  const od = g.createImageData(W,H), dd=od.data;
+  for (let p=0,i=0;p<alpha.length;p++,i+=4) {
+    dd[i]=R; dd[i+1]=G; dd[i+2]=B; dd[i+3]=alpha[p];
+  }
+  g.putImageData(od,0,0);
 }
 
-// 初始化颜色显示
-updateColorDisplay();
+updateColorUI();
 </script>
 
 </body>

@@ -488,13 +488,8 @@
       <div class="color-row" style="gap:10px;">
         <div class="color-swatch-big" id="colorSwatch" title="点击展开调色盘"></div>
         <input type="text" id="colorHex" class="hex" value="#FFFFFF" maxlength="7" style="flex:1;">
+        <input type="color" id="nativeColor" value="#FFFFFF" style="width:32px;height:32px;border:2px solid var(--border-strong);border-radius:8px;cursor:pointer;background:transparent;padding:0;">
         <button class="palette-toggle" id="paletteToggle" type="button" style="margin:0;white-space:nowrap;">🎨 调色盘</button>
-        <button class="eyedropper-btn" id="eyedropperBtn" type="button" title="取屏幕任意位置颜色" style="margin:0;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21.64 13L11 2.36c-.55-.55-1.44-.55-1.99 0L2.36 9c-.55.55-.55 1.44 0 1.99L13 21.64c.55.55 1.44.55 1.99 0l6.65-6.65c.55-.55.55-1.44 0-1.99z"/>
-            <line x1="7" y1="17" x2="3" y2="21"/>
-          </svg>
-        </button>
       </div>
 
       <div class="preset-colors">
@@ -675,7 +670,7 @@ const hslSv = document.getElementById('hslSv');
 const hslSvCursor = document.getElementById('hslSvCursor');
 const hslHue = document.getElementById('hslHue');
 const hslHueCursor = document.getElementById('hslHueCursor');
-const eyedropperBtn = document.getElementById('eyedropperBtn');
+const nativeColor = document.getElementById('nativeColor');
 const thresh = document.getElementById('thresh');
 const threshLabel = document.getElementById('threshLabel');
 const threshVal = document.getElementById('threshVal');
@@ -740,6 +735,7 @@ function updateColorDisplay() {
 function setColor(hex) {
   currentColor = hex;
   currentHSL = hexToHSL(hex);
+  nativeColor.value = hex;
   updateColorDisplay();
   if (rawSketch) renderLineart();
 }
@@ -824,23 +820,8 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('mouseup', () => { window._hslSvDrag = false; window._hslHueDrag = false; });
 
-// ============ 全屏取色（EyeDropper API） ============
-eyedropperBtn.addEventListener('click', async () => {
-  if (!('EyeDropper' in window)) {
-    setStatus('⚠️ 你的浏览器不支持全屏取色。请用 Chrome/Edge 95+', 'err');
-    return;
-  }
-  try {
-    const dropper = new EyeDropper();
-    const result = await dropper.open();
-    let hex = result.sRGBHex || '#FFFFFF';
-    if (!hex.startsWith('#')) hex = '#' + hex;
-    setColor(hex);
-    setStatus('取色成功：' + hex.toUpperCase(), 'ok');
-  } catch (e) {
-    if (e?.name !== 'AbortError') { console.error(e); }
-  }
-});
+// ============ 原生系统取色器（完全无全屏/放大镜） ============
+nativeColor.addEventListener('input', () => setColor(nativeColor.value));
 
 // ============ 强度滑块 ============
 thresh.addEventListener('input', () => {
@@ -940,18 +921,18 @@ function renderLineart() {
   const od = g.createImageData(W, H);
   const dd = od.data;
 
-  // 模型输出：v 高=亮(线条)，v 低=暗(背景)
-  // 线稿强度 t=0→保留所有(0~1)，t=0.3→砍掉<0.3的微弱部分
+  // 模型输出：v 低=线条（暗），v 高=背景（亮）
+  // 所以先反转：inv = 1 - v → 线条变高，背景变低
   for (let p = 0, i = 0; p < rawSketch.length; p++, i += 4) {
-    const v = rawSketch[p];
-    // 先减掉阈值（砍掉背景噪声），然后 clamp 到正范围
+    const v = 1 - rawSketch[p]; // ⬅️ 关键反转！
+    // 减阈值砍背景噪声
     const clip = Math.max(0, v - t);
-    // 归一化：原来 t=0.3 时，有效范围是 0.3~1.0 → 归一化到 0~1
+    // 归一化到 0~1
     const alpha = Math.round(clip / (1 - t) * 255);
-    dd[i]     = R;        // 线条颜色（目标色）
+    dd[i]     = R;
     dd[i + 1] = G;
     dd[i + 2] = B;
-    dd[i + 3] = Math.max(0, Math.min(255, alpha)); // 背景自然是 0（透明）
+    dd[i + 3] = Math.max(0, Math.min(255, alpha));
   }
   g.putImageData(od, 0, 0);
   outInfo.textContent = W + '×' + H;

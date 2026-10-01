@@ -485,9 +485,16 @@
   <div class="controls">
     <div class="ctrl">
       <div class="ctrl-label">描边颜色</div>
-      <div class="color-row">
+      <div class="color-row" style="gap:10px;">
         <div class="color-swatch-big" id="colorSwatch" title="点击展开调色盘"></div>
-        <input type="text" id="colorHex" class="hex" value="#FFFFFF" maxlength="7">
+        <input type="text" id="colorHex" class="hex" value="#FFFFFF" maxlength="7" style="flex:1;">
+        <button class="palette-toggle" id="paletteToggle" type="button" style="margin:0;white-space:nowrap;">🎨 调色盘</button>
+        <button class="eyedropper-btn" id="eyedropperBtn" type="button" title="取屏幕任意位置颜色" style="margin:0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.64 13L11 2.36c-.55-.55-1.44-.55-1.99 0L2.36 9c-.55.55-.55 1.44 0 1.99L13 21.64c.55.55 1.44.55 1.99 0l6.65-6.65c.55-.55.55-1.44 0-1.99z"/>
+            <line x1="7" y1="17" x2="3" y2="21"/>
+          </svg>
+        </button>
       </div>
 
       <div class="preset-colors">
@@ -505,22 +512,6 @@
         <button style="background:#ee55dd" title="粉紫" data-c="#ee55dd"></button>
         <button style="background:#ff6699" title="粉" data-c="#ff6699"></button>
       </div>
-
-      <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
-        <div style="position:relative;">
-          <input type="color" id="nativeColor" value="#FFFFFF" style="width:32px;height:32px;border:2px solid var(--border-strong);border-radius:8px;cursor:pointer;background:transparent;padding:0;">
-          <span style="position:absolute;top:-1px;left:38px;font-size:12px;color:var(--text-dim);pointer-events:none;">系统取色器</span>
-        </div>
-        <button class="palette-toggle" id="paletteToggle" type="button">🎨 调色盘</button>
-        <button class="eyedropper-btn" id="eyedropperBtn" type="button" title="只能取原图区域颜色">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21.64 13L11 2.36c-.55-.55-1.44-.55-1.99 0L2.36 9c-.55.55-.55 1.44 0 1.99L13 21.64c.55.55 1.44.55 1.99 0l6.65-6.65c.55-.55.55-1.44 0-1.99z"/>
-            <line x1="7" y1="17" x2="3" y2="21"/>
-          </svg>
-          原图取色
-        </button>
-      </div>
-      <div class="eyedropper-hint">点原图任意位置取色（ESC 或点空白处取消）</div>
 
       <!-- HSL 调色盘 -->
       <div class="palette" id="palette">
@@ -685,7 +676,6 @@ const hslSvCursor = document.getElementById('hslSvCursor');
 const hslHue = document.getElementById('hslHue');
 const hslHueCursor = document.getElementById('hslHueCursor');
 const eyedropperBtn = document.getElementById('eyedropperBtn');
-const nativeColor = document.getElementById('nativeColor');
 const thresh = document.getElementById('thresh');
 const threshLabel = document.getElementById('threshLabel');
 const threshVal = document.getElementById('threshVal');
@@ -701,7 +691,6 @@ let rawSketch = null;
 let sketchHW = null;
 let currentColor = '#FFFFFF';
 let currentHSL = { h: 0.0, s: 0.0, l: 1.0 }; // 白
-let eyedropperActive = false;
 
 // ============ 颜色工具 ============
 function hexToHSL(hex) {
@@ -751,16 +740,18 @@ function updateColorDisplay() {
 function setColor(hex) {
   currentColor = hex;
   currentHSL = hexToHSL(hex);
-  nativeColor.value = hex; // 同步系统取色器
   updateColorDisplay();
   if (rawSketch) renderLineart();
 }
 
 // ============ 状态 ============
+const statusSpinner = document.querySelector('#status .spinner');
 function setStatus(msg, type = 'busy') {
   status.style.display = 'flex';
   status.className = 'status ' + type;
   statusText.textContent = msg;
+  // ok/err 隐藏 spinner，只有 busy 才转
+  statusSpinner.style.display = (type === 'busy') ? '' : 'none';
 }
 function clearStatus() { status.style.display = 'none'; }
 
@@ -833,39 +824,21 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('mouseup', () => { window._hslSvDrag = false; window._hslHueDrag = false; });
 
-// ============ 原生系统取色器（无放大镜） ============
-nativeColor.addEventListener('input', () => setColor(nativeColor.value));
-
-// ============ 原图取色（只能取 canvas 上的图片区域） ============
-eyedropperBtn.addEventListener('click', () => {
-  eyedropperActive = !eyedropperActive;
-  eyedropperBtn.classList.toggle('active', eyedropperActive);
-  srcCanvas.style.cursor = eyedropperActive ? 'crosshair' : '';
-});
-srcCanvas.addEventListener('click', e => {
-  if (!eyedropperActive || !img) return;
-  const rect = srcCanvas.getBoundingClientRect();
-  const cx = Math.floor((e.clientX - rect.left) * srcCanvas.width / rect.width);
-  const cy = Math.floor((e.clientY - rect.top) * srcCanvas.height / rect.height);
-  const data = srcCanvas.getContext('2d').getImageData(cx, cy, 1, 1).data;
-  const hex = '#' + [data[0], data[1], data[2]].map(v => v.toString(16).padStart(2,'0')).join('');
-  setColor(hex);
-  eyedropperActive = false;
-  eyedropperBtn.classList.remove('active');
-  srcCanvas.style.cursor = '';
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && eyedropperActive) {
-    eyedropperActive = false;
-    eyedropperBtn.classList.remove('active');
-    srcCanvas.style.cursor = '';
+// ============ 全屏取色（EyeDropper API） ============
+eyedropperBtn.addEventListener('click', async () => {
+  if (!('EyeDropper' in window)) {
+    setStatus('⚠️ 你的浏览器不支持全屏取色。请用 Chrome/Edge 95+', 'err');
+    return;
   }
-});
-document.addEventListener('click', e => {
-  if (eyedropperActive && !srcCanvas.contains(e.target) && !eyedropperBtn.contains(e.target)) {
-    eyedropperActive = false;
-    eyedropperBtn.classList.remove('active');
-    srcCanvas.style.cursor = '';
+  try {
+    const dropper = new EyeDropper();
+    const result = await dropper.open();
+    let hex = result.sRGBHex || '#FFFFFF';
+    if (!hex.startsWith('#')) hex = '#' + hex;
+    setColor(hex);
+    setStatus('取色成功：' + hex.toUpperCase(), 'ok');
+  } catch (e) {
+    if (e?.name !== 'AbortError') { console.error(e); }
   }
 });
 

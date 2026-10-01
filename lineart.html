@@ -506,17 +506,21 @@
         <button style="background:#ff6699" title="粉" data-c="#ff6699"></button>
       </div>
 
-      <div style="display:flex; gap:8px; margin-top:10px;">
+      <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+        <div style="position:relative;">
+          <input type="color" id="nativeColor" value="#FFFFFF" style="width:32px;height:32px;border:2px solid var(--border-strong);border-radius:8px;cursor:pointer;background:transparent;padding:0;">
+          <span style="position:absolute;top:-1px;left:38px;font-size:12px;color:var(--text-dim);pointer-events:none;">系统取色器</span>
+        </div>
         <button class="palette-toggle" id="paletteToggle" type="button">🎨 调色盘</button>
-        <button class="eyedropper-btn" id="eyedropperBtn" type="button" title="取屏幕任意位置颜色">
+        <button class="eyedropper-btn" id="eyedropperBtn" type="button" title="只能取原图区域颜色">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.64 13L11 2.36c-.55-.55-1.44-.55-1.99 0L2.36 9c-.55.55-.55 1.44 0 1.99L13 21.64c.55.55 1.44.55 1.99 0l6.65-6.65c.55-.55.55-1.44 0-1.99z"/>
             <line x1="7" y1="17" x2="3" y2="21"/>
           </svg>
-          吸管
+          原图取色
         </button>
       </div>
-      <div class="eyedropper-hint">Chrome/Edge 可直接取屏幕任意位置；其他浏览器降级为原图取色</div>
+      <div class="eyedropper-hint">点原图任意位置取色（ESC 或点空白处取消）</div>
 
       <!-- HSL 调色盘 -->
       <div class="palette" id="palette">
@@ -681,6 +685,7 @@ const hslSvCursor = document.getElementById('hslSvCursor');
 const hslHue = document.getElementById('hslHue');
 const hslHueCursor = document.getElementById('hslHueCursor');
 const eyedropperBtn = document.getElementById('eyedropperBtn');
+const nativeColor = document.getElementById('nativeColor');
 const thresh = document.getElementById('thresh');
 const threshLabel = document.getElementById('threshLabel');
 const threshVal = document.getElementById('threshVal');
@@ -746,6 +751,7 @@ function updateColorDisplay() {
 function setColor(hex) {
   currentColor = hex;
   currentHSL = hexToHSL(hex);
+  nativeColor.value = hex; // 同步系统取色器
   updateColorDisplay();
   if (rawSketch) renderLineart();
 }
@@ -827,40 +833,15 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('mouseup', () => { window._hslSvDrag = false; window._hslHueDrag = false; });
 
-// ============ 吸管（EyeDropper API，可取屏幕任意位置颜色） ============
-eyedropperBtn.addEventListener('click', async () => {
-  if (!('EyeDropper' in window)) {
-    setStatus('⚠️ 你的浏览器不支持取屏幕吸管。请用 Chrome 95+ / Edge 95+，或先用"原图取色"模式', 'err');
-    // 降级到 canvas 像素取色
-    startCanvasEyedropper();
-    return;
-  }
-  try {
-    const dropper = new EyeDropper();
-    const result = await dropper.open();
-    // result.sRGBHex 形如 #FF00AA
-    let hex = result.sRGBHex || '#FFFFFF';
-    if (!hex.startsWith('#')) {
-      hex = '#' + hex;
-      const n = parseInt(hex.slice(1), 16);
-      hex = '#' + n.toString(16).padStart(6, '0');
-    }
-    setColor(hex);
-    setStatus('取色成功：' + hex.toUpperCase(), 'ok');
-  } catch (e) {
-    if (e?.name !== 'AbortError') {
-      console.error(e);
-      setStatus('取色取消', 'busy');
-    }
-  }
-});
+// ============ 原生系统取色器（无放大镜） ============
+nativeColor.addEventListener('input', () => setColor(nativeColor.value));
 
-// 降级：canvas 像素取色（只能取原图区域）
-function startCanvasEyedropper() {
-  eyedropperActive = true;
-  eyedropperBtn.classList.add('active');
-  srcCanvas.style.cursor = 'crosshair';
-}
+// ============ 原图取色（只能取 canvas 上的图片区域） ============
+eyedropperBtn.addEventListener('click', () => {
+  eyedropperActive = !eyedropperActive;
+  eyedropperBtn.classList.toggle('active', eyedropperActive);
+  srcCanvas.style.cursor = eyedropperActive ? 'crosshair' : '';
+});
 srcCanvas.addEventListener('click', e => {
   if (!eyedropperActive || !img) return;
   const rect = srcCanvas.getBoundingClientRect();

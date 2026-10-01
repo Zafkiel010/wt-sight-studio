@@ -232,14 +232,7 @@
     cursor: crosshair;
     border: 1px solid var(--border-strong);
     margin-bottom: 8px;
-  }
-  .hsl-sv::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(to right, #fff, transparent),
-                linear-gradient(to top, #000, transparent);
-    border-radius: 8px;
-    pointer-events: none;
+    overflow: hidden;
   }
   .hsl-sv-cursor {
     position: absolute;
@@ -498,13 +491,19 @@
       </div>
 
       <div class="preset-colors">
-        <button style="background:#ffffff" title="白" data-c="#ffffff"></button>
+        <button style="background:#ffffff;border-color:#666" title="白" data-c="#ffffff"></button>
         <button style="background:#000000" title="黑" data-c="#000000"></button>
-        <button style="background:#ff4466" title="红" data-c="#ff4466"></button>
-        <button style="background:#44ccff" title="蓝" data-c="#44ccff"></button>
-        <button style="background:#88ff44" title="绿" data-c="#88ff44"></button>
-        <button style="background:#ffcc44" title="黄" data-c="#ffcc44"></button>
-        <button style="background:#cc66ff" title="紫" data-c="#cc66ff"></button>
+        <button style="background:#ff4444" title="红" data-c="#ff4444"></button>
+        <button style="background:#ff8822" title="橙" data-c="#ff8822"></button>
+        <button style="background:#ffcc33" title="黄" data-c="#ffcc33"></button>
+        <button style="background:#88dd44" title="黄绿" data-c="#88dd44"></button>
+        <button style="background:#22cc66" title="绿" data-c="#22cc66"></button>
+        <button style="background:#22ccaa" title="青绿" data-c="#22ccaa"></button>
+        <button style="background:#33aaff" title="蓝" data-c="#33aaff"></button>
+        <button style="background:#5566ff" title="靛" data-c="#5566ff"></button>
+        <button style="background:#9955ff" title="紫" data-c="#9955ff"></button>
+        <button style="background:#ee55dd" title="粉紫" data-c="#ee55dd"></button>
+        <button style="background:#ff6699" title="粉" data-c="#ff6699"></button>
       </div>
 
       <div style="display:flex; gap:8px; margin-top:10px;">
@@ -696,7 +695,7 @@ let img = null;
 let rawSketch = null;
 let sketchHW = null;
 let currentColor = '#FFFFFF';
-let currentHSL = { h: 0, s: 0, l: 1 }; // 白
+let currentHSL = { h: 0.0, s: 0.0, l: 1.0 }; // 白
 let eyedropperActive = false;
 
 // ============ 颜色工具 ============

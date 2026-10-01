@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>线稿导出器 · Lineart Exporter</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, Segoe UI, "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 24px 16px;
+  }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; letter-spacing: 1px; }
+  .sub { font-size: 13px; color: #8892a4; margin-bottom: 20px; }
+  .sub code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; }
+
+  .card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: 20px;
+    width: 100%;
+    max-width: 720px;
+    backdrop-filter: blur(10px);
+  }
+
+  /* 文件上传 */
+  .drop {
+    position: relative;
+    border: 2px dashed rgba(255,255,255,.2);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    font-size: 14px;
+    color: #a0a8b8;
+  }
+  .drop input[type="file"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .drop:hover, .drop.drag { border-color: #6366f1; background: rgba(99,102,241,.06); }
+  .drop .hint { font-size: 12px; color: #6b7280; margin-top: 6px; }
+
+  /* 预览区 */
+  .preview-wrap { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .preview-box {
+    background: #0a0a14;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    min-height: 240px;
+  }
+  .preview-box .label {
+    font-size: 11px; color: #6b7280; padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .preview-box canvas, .preview-box img {
+    width: 100%; flex: 1; object-fit: contain; background: transparent;
+  }
+  .preview-box.checker-bg canvas {
+    /* 透明棋盘背景 */
+    background-image:
+      linear-gradient(45deg, #2a2a3a 25%, transparent 25%),
+      linear-gradient(-45deg, #2a2a3a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2a2a3a 75%),
+      linear-gradient(-45deg, transparent 75%, #2a2a3a 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #1a1a2e;
+  }
+
+  /* 控制面板 */
+  .controls { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .ctrl-group { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl-group label { font-size: 12px; color: #8892a4; }
+  .ctrl-group .row { display: flex; gap: 8px; align-items: center; }
+
+  /* 颜色控制 */
+  input[type="color"] {
+    width: 44px; height: 36px; border: none; border-radius: 8px; cursor: pointer;
+    background: transparent; padding: 0;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,.15); border-radius: 8px; }
+  input[type="text"].hex {
+    width: 90px; padding: 6px 10px; border-radius: 6px;
+    background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.12);
+    color: #e0e0e0; font-family: monospace; font-size: 13px; text-transform: uppercase;
+  }
+  .preset-colors { display: flex; gap: 6px; }
+  .preset-colors button {
+    width: 26px; height: 26px; border-radius: 6px; border: 2px solid rgba(255,255,255,.2);
+    cursor: pointer; padding: 0;
+  }
+  .preset-colors button:hover { transform: scale(1.15); }
+
+  /* 强度滑块 */
+  input[type="range"] { width: 160px; accent-color: #6366f1; }
+
+  /* 按钮 */
+  button.btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 8px;
+    padding: 10px 22px; font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all .2s;
+  }
+  button.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,.4); }
+  button.btn:disabled { opacity: .45; cursor: not-allowed; }
+  button.btn.ghost {
+    background: rgba(255,255,255,.08); color: #e0e0e0;
+    border: 1px solid rgba(255,255,255,.15);
+  }
+  button.btn.ghost:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+
+  /* 状态条 */
+  .status {
+    margin-top: 12px; padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; display: flex; align-items: center; gap: 8px;
+  }
+  .status.busy { background: rgba(99,102,241,.15); color: #a5b4fc; }
+  .status.err { background: rgba(239,68,68,.15); color: #fca5a5; }
+  .status.ok { background: rgba(34,197,94,.15); color: #86efac; }
+  .bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,.1); border-radius: 3px; overflow: hidden; }
+  .bar-fg { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 3px; width: 0%; transition: width .2s; }
+</style>
+</head>
+<body>
+
+<h1>🖌️ 线稿导出器</h1>
+<p class="sub">AI 自动描边 · 透明背景 PNG · 可自定义描边颜色</p>
+
+<div class="card">
+  <!-- 上传 -->
+  <label class="drop" id="drop">
+    <div style="font-size:36px;margin-bottom:8px;">📷</div>
+    点击或拖拽图片到这里
+    <div class="hint">支持 PNG / JPG / WEBP · 建议人物立绘或头像</div>
+    <input type="file" id="file" accept="image/*">
+  </label>
+
+  <!-- 预览 -->
+  <div class="preview-wrap">
+    <div class="preview-box">
+      <div class="label"><span>原图</span><span id="srcInfo">-</span></div>
+      <canvas id="srcCanvas"></canvas>
+    </div>
+    <div class="preview-box checker-bg">
+      <div class="label"><span>线稿（透明背景）</span><span id="outInfo">-</span></div>
+      <canvas id="outCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- 控制面板 -->
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>描边颜色</label>
+      <div class="row">
+        <input type="color" id="colorPicker" value="#ffffff">
+        <input type="text" id="colorHex" class="hex" value="#FFFFFF" maxlength="7">
+      </div>
+      <div class="preset-colors">
+        <button style="background:#ffffff" title="白" data-c="#ffffff"></button>
+        <button style="background:#000000" title="黑" data-c="#000000"></button>
+        <button style="background:#ff4466" title="红" data-c="#ff4466"></button>
+        <button style="background:#44ccff" title="蓝" data-c="#44ccff"></button>
+        <button style="background:#88ff44" title="绿" data-c="#88ff44"></button>
+        <button style="background:#ffcc44" title="黄" data-c="#ffcc44"></button>
+        <button style="background:#cc66ff" title="紫" data-c="#cc66ff"></button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <label>线稿强度 <span id="threshLabel">10%</span></label>
+      <input type="range" id="thresh" min="0" max="30" value="10" title="线条保留阈值（越小线条越多，越大只保最粗主线）">
+    </div>
+
+    <div class="ctrl-group">
+      <label>最大边</label>
+      <div class="row">
+        <select id="skSize" style="padding:6px 10px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);color:#e0e0e0;border-radius:6px;">
+          <option value="0">原图大小</option>
+          <option value="1024">1024px</option>
+          <option value="2048" selected>2048px（推荐）</option>
+          <option value="3072">3072px</option>
+          <option value="4096">4096px（小图放大出细线条）</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 按钮 -->
+  <div class="controls" style="margin-top:12px;">
+    <button class="btn" id="goBtn" disabled>✨ 生成线稿</button>
+    <button class="btn ghost" id="recolorBtn" disabled>🎨 只改颜色</button>
+    <button class="btn ghost" id="dlBtn" disabled>💾 下载 PNG</button>
+  </div>
+
+  <!-- 状态 -->
+  <div class="status" id="status" style="display:none;"></div>
+</div>
+
+<script>
+// ============ onnxruntime 加载（动态 <script>，挂 window.ort，UMD） ============
+const ORT_CDN_BASES = [
+  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/',
+  'https://unpkg.com/onnxruntime-web@1.19.2/dist/',
+  // 本地同源（serve.ps1 或 Pages 都有）
+  'ort/'
+];
+let ortLoadPromise = null;
+
+function loadOrt() {
+  if (window.ort) return Promise.resolve(window.ort);
+  if (ortLoadPromise) return ortLoadPromise;
+  ortLoadPromise = (async () => {
+    let lastErr = null;
+    for (const base of ORT_CDN_BASES) {
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = base + 'ort.min.js';
+          s.async = true;
+          const timer = setTimeout(() => reject(new Error('加载超时')), 15000);
+          s.onload = () => { clearTimeout(timer); resolve(); };
+          s.onerror = () => { clearTimeout(timer); reject(new Error('HTTP 加载失败')); };
+          document.head.appendChild(s);
+        });
+        if (window.ort) {
+          // 配置 WASM 路径
+          window.ort.env.wasm.wasmPaths = base;
+          window.ort.env.wasm.simd = true;
+          window.ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency - 1);
+          console.log('ort loaded from', base);
+          return window.ort;
+        }
+        throw new Error('window.ort 未定义');
+      } catch (e) {
+        lastErr = e;
+        console.warn('ORT 源失败:', base, e.message);
+        ortLoadPromise = null;
+      }
+    }
+    ortLoadPromise = null;
+    throw new Error('onnxruntime-web 加载失败：' + (lastErr?.message || '未知') + '（所有 CDN 源都挂了）');
+  })();
+  return ortLoadPromise;
+}
+
+// ============ 模型加载（带 CDN fallback + 15s 超时） ============
+const MODEL_SOURCES = [
+  // jsdelivr 优先（国内快）
+  (name) => `https://cdn.jsdelivr.net/gh/Zafkiel010/wt-sight-studio@main/model/${name}.onnx`,
+  // GitHub raw 镜像
+  (name) => `https://raw.githubusercontent.com/Zafkiel010/wt-sight-studio/main/model/${name}.onnx`,
+  // 同源（本地 serve 或 Pages）
+  (name) => `model/${name}.onnx`
+];
+
+async function fetchModelWithProgress(name, onProgress) {
+  let lastProgress = 0, stallTimer = null;
+  const tryFetch = async (url) => {
+    setStatus('加载模型 ' + name + ' … (' + url.split('/')[2] + ')', 'busy');
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const total = +resp.headers.get('Content-Length');
+    if (!total) return resp.arrayBuffer();
+    const reader = resp.body.getReader();
+    const chunks = [], letf = total;
+    let received = 0;
+    stallTimer = setInterval(() => {
+      if (received === lastProgress) {
+        clearInterval(stallTimer);
+        throw new Error('15秒无进度');
+      }
+      lastProgress = received;
+    }, 15000);
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      chunks.push(value); received += value.length;
+      const pct = Math.round(received / total * 100);
+      if (pct - lastProgress >= 5) {
+        lastProgress = pct;
+        if (onProgress) onProgress(pct);
+        setStatus('加载模型 ' + name + ' … ' + pct + '% (' + Math.round(received/1024/1024*10)/10 + '/' + Math.round(total/1024/1024*10)/10 + ' MB)', 'busy');
+      }
+    }
+    clearInterval(stallTimer);
+    return new Blob(chunks).arrayBuffer();
+  };
+  let lastErr = null;
+  for (const mkUrl of MODEL_SOURCES) {
+    try { return await tryFetch(mkUrl(name)); } catch (e) { lastErr = e; console.warn('模型源失败:', e.message); }
+  }
+  throw new Error('模型加载失败：' + lastErr.message + '（所有 CDN 源都挂了，国内网络请用本地服务器 serve.ps1）');
+}
+
+// ============ DOM ============
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const srcCanvas = document.getElementById('srcCanvas');
+const outCanvas = document.getElementById('outCanvas');
+const srcInfo = document.getElementById('srcInfo');
+const outInfo = document.getElementById('outInfo');
+const colorPicker = document.getElementById('colorPicker');
+const colorHex = document.getElementById('colorHex');
+const thresh = document.getElementById('thresh');
+const threshLabel = document.getElementById('threshLabel');
+const skSize = document.getElementById('skSize');
+const goBtn = document.getElementById('goBtn');
+const recolorBtn = document.getElementById('recolorBtn');
+const dlBtn = document.getElementById('dlBtn');
+const status = document.getElementById('status');
+
+let img = null;       // 原图 Image
+let rawSketch = null; // 模型输出的灰度 float32（0~1），H*W 一维
+let sketchHW = null;  // { H, W }
+let currentColor = '#FFFFFF';
+
+// ============ 状态条 ============
+function setStatus(msg, type = 'busy') {
+  status.style.display = 'flex';
+  status.className = 'status ' + type;
+  status.innerHTML = msg;
+}
+function clearStatus() { status.style.display = 'none'; }
+
+// ============ 文件上传 ============
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('drag');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(f) {
+  const im = new Image();
+  im.onload = () => {
+    img = im;
+    srcInfo.textContent = im.width + '×' + im.height;
+    // 画到 srcCanvas
+    srcCanvas.width = im.width; srcCanvas.height = im.height;
+    srcCanvas.getContext('2d').drawImage(im, 0, 0);
+    goBtn.disabled = false;
+    recolorBtn.disabled = true;
+    dlBtn.disabled = true;
+    clearStatus();
+    // 清空 out
+    const g = outCanvas.getContext('2d');
+    outCanvas.width = outCanvas.height = 1;
+  };
+  im.src = URL.createObjectURL(f);
+}
+
+// ============ 颜色控制 ============
+colorPicker.addEventListener('input', () => {
+  currentColor = colorPicker.value;
+  colorHex.value = currentColor.toUpperCase();
+  if (rawSketch) renderLineart();
+});
+colorHex.addEventListener('change', () => {
+  let v = colorHex.value.trim();
+  if (!v.startsWith('#')) v = '#' + v;
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+    currentColor = v;
+    colorPicker.value = v;
+    if (rawSketch) renderLineart();
+  } else {
+    colorHex.value = currentColor.toUpperCase();
+  }
+});
+document.querySelectorAll('.preset-colors button').forEach(b => {
+  b.addEventListener('click', () => {
+    currentColor = b.dataset.c;
+    colorPicker.value = currentColor;
+    colorHex.value = currentColor.toUpperCase();
+    if (rawSketch) renderLineart();
+  });
+});
+
+// ============ 强度滑块 ============
+thresh.addEventListener('input', () => {
+  threshLabel.textContent = thresh.value + '%';
+  if (rawSketch) renderLineart();
+});
+
+// ============ 主按钮 ============
+goBtn.addEventListener('click', generateLineart);
+recolorBtn.addEventListener('click', () => { if (rawSketch) renderLineart(); });
+dlBtn.addEventListener('click', () => {
+  outCanvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.download = 'lineart_' + ts + '.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }, 'image/png');
+});
+
+// ============ 生成线稿（AI 推理） ============
+async function generateLineart() {
+  if (!img) return;
+  goBtn.disabled = true;
+  try {
+    const size = parseInt(skSize.value);
+    let W = img.width, H = img.height;
+    const maxSide = size > 0 ? size : Math.max(W, H);
+    const k = maxSide / Math.max(W, H);
+    W = Math.max(8, Math.round(W * k / 8) * 8);
+    H = Math.max(8, Math.round(H * k / 8) * 8);
+
+    // 预处理
+    setStatus('预处理 ' + W + '×' + H + ' …', 'busy');
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, 0, W, H);
+    const id = g.getImageData(0, 0, W, H);
+    const d = id.data, px = W * H;
+    const rgb = new Float32Array(3 * px);
+    for (let i = 0, p = 0; p < px; p++, i += 4) {
+      rgb[p] = d[i] / 255;
+      rgb[p + px] = d[i + 1] / 255;
+      rgb[p + 2 * px] = d[i + 2] / 255;
+    }
+
+    // 加载 ORT + 模型
+    setStatus('加载 AI 模型（首次约需下载 17MB）…', 'busy');
+    const ortMod = await loadOrt();
+    const bytes = await fetchModelWithProgress('line-drawings', (p) => {});
+    const sess = await ortMod.InferenceSession.create(bytes, {
+      executionProviders: ['wasm'], graphOptimizationLevel: 'all'
+    });
+
+    // 推理
+    setStatus('AI 推理中（' + W + '×' + H + '）…', 'busy');
+    await new Promise(r => setTimeout(r, 30));
+    const feeds = {}; feeds[sess.inputNames[0]] = new ortMod.Tensor('float32', rgb, [1, 3, H, W]);
+    const out = await sess.run(feeds);
+    const tn = sess.outputNames[0];
+    const dims = out[tn].dims;
+    const arr = out[tn].data;
+    const OH = dims[2], OW = dims[3];
+
+    rawSketch = new Float32Array(arr.length);
+    for (let i = 0; i < arr.length; i++) rawSketch[i] = Math.max(0, Math.min(1, arr[i]));
+    sketchHW = { H: OH, W: OW };
+
+    setStatus('后处理中…', 'busy');
+    renderLineart();
+    setStatus('完成！线稿 ' + OW + '×' + OH + ' · ' + Math.round(arr.length / 1000) + 'K 像素', 'ok');
+    recolorBtn.disabled = false;
+    dlBtn.disabled = false;
+  } catch (e) {
+    console.error(e);
+    setStatus('❌ ' + (e.message || e) + '<br><small style="color:#fca5a5">建议：国内网络请用本地服务器运行，或稍后再试</small>', 'err');
+  } finally {
+    goBtn.disabled = false;
+  }
+}
+
+// ============ 渲染线稿（透明背景 + 可改颜色） ============
+function renderLineart() {
+  if (!rawSketch || !sketchHW) return;
+  const { H, W } = sketchHW;
+
+  // 解析颜色
+  const hex = currentColor.replace('#', '');
+  const R = parseInt(hex.substring(0, 2), 16);
+  const G = parseInt(hex.substring(2, 4), 16);
+  const B = parseInt(hex.substring(4, 6), 16);
+
+  // 阈值（0~30）：越大只保最粗主线
+  const threshPct = parseInt(thresh.value);
+  // 模型输出 v≈0=白/背景, v≈1=黑/线条
+  // 我们要把 v 高的地方 = 线条 = 不透明
+  // threshold 0% => alpha = v*255 （所有线条都保留）
+  // threshold 30% => alpha = (v-0.3)/0.7 * 255 （去掉淡线条）
+  const t = threshPct / 100; // 0~0.3
+
+  outCanvas.width = W;
+  outCanvas.height = H;
+  const g = outCanvas.getContext('2d');
+  const od = g.createImageData(W, H);
+  const dd = od.data;
+
+  for (let p = 0, i = 0; p < rawSketch.length; p++, i += 4) {
+    const v = rawSketch[p]; // 0~1, 1=黑/线条
+    let alpha = 0;
+    if (v > t) alpha = Math.round(((v - t) / (1 - t)) * 255);
+    if (alpha > 255) alpha = 255;
+    dd[i]     = R;
+    dd[i + 1] = G;
+    dd[i + 2] = B;
+    dd[i + 3] = alpha;
+  }
+  g.putImageData(od, 0, 0);
+  outInfo.textContent = W + '×' + H;
+}
+</script>
+
+</body>
+</html>

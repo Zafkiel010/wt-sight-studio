@@ -210,11 +210,11 @@
 
 <script>
 // ============ onnxruntime 加载（动态 <script>，挂 window.ort，UMD） ============
+// 优先级：本地同源（serve.ps1/Pages 都带）> 两个 CDN 兜底
 const ORT_CDN_BASES = [
+  'ort/',
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/',
-  'https://unpkg.com/onnxruntime-web@1.19.2/dist/',
-  // 本地同源（serve.ps1 或 Pages 都有）
-  'ort/'
+  'https://unpkg.com/onnxruntime-web@1.19.2/dist/'
 ];
 let ortLoadPromise = null;
 
@@ -229,28 +229,34 @@ function loadOrt() {
           const s = document.createElement('script');
           s.src = base + 'ort.min.js';
           s.async = true;
-          const timer = setTimeout(() => reject(new Error('加载超时')), 15000);
+          const timer = setTimeout(() => {
+            s.onerror = null; s.onload = null;
+            reject(new Error('加载超时'));
+          }, 15000);
           s.onload = () => { clearTimeout(timer); resolve(); };
           s.onerror = () => { clearTimeout(timer); reject(new Error('HTTP 加载失败')); };
           document.head.appendChild(s);
         });
+        // script onload 只代表 HTTP 成功，不代表 UMD 已初始化
+        // 等一个 microtask 让同步 UMD 代码跑完
+        await new Promise(r => setTimeout(r, 50));
         if (window.ort) {
-          // 配置 WASM 路径
           window.ort.env.wasm.wasmPaths = base;
           window.ort.env.wasm.simd = true;
           window.ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency - 1);
           console.log('ort loaded from', base);
           return window.ort;
         }
-        throw new Error('window.ort 未定义');
+        throw new Error('window.ort 未定义（UMD 可能初始化失败）');
       } catch (e) {
         lastErr = e;
-        console.warn('ORT 源失败:', base, e.message);
-        ortLoadPromise = null;
+        console.warn('ORT 源失败 (' + base + '):', e.message);
+        // 移除失败的 script 标签
+        document.querySelectorAll('script[src*="onnxruntime"], script[src*="ort.min"]').forEach(s => s.remove());
       }
     }
     ortLoadPromise = null;
-    throw new Error('onnxruntime-web 加载失败：' + (lastErr?.message || '未知') + '（所有 CDN 源都挂了）');
+    throw new Error('onnxruntime-web 加载失败：' + (lastErr?.message || '未知') + '（请用本地服务器 serve.ps1 访问）');
   })();
   return ortLoadPromise;
 }

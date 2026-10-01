@@ -238,13 +238,17 @@ function loadOrt() {
           document.head.appendChild(s);
         });
         // script onload 只代表 HTTP 成功，不代表 UMD 已初始化
-        // 等一个 microtask 让同步 UMD 代码跑完
         await new Promise(r => setTimeout(r, 50));
         if (window.ort) {
-          window.ort.env.wasm.wasmPaths = base;
+          // wasmPaths 必须是**绝对 URL**！相对 'ort/' 会导致 ORT 内部 ESM import 解析失败
+          window.ort.env.wasm.wasmPaths = new URL(base, location.href).href;
           window.ort.env.wasm.simd = true;
-          window.ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency - 1);
-          console.log('ort loaded from', base);
+          if (self.crossOriginIsolated && (navigator.hardwareConcurrency || 1) > 2) {
+            window.ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency - 1);
+          } else {
+            window.ort.env.wasm.numThreads = 1;
+          }
+          console.log('ort loaded from', base, '→ wasmPaths=' + ort.env.wasm.wasmPaths, 'threads=' + ort.env.wasm.numThreads);
           return window.ort;
         }
         throw new Error('window.ort 未定义（UMD 可能初始化失败）');
